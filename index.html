@@ -279,13 +279,13 @@ ol.steps li { margin: 4px 0; }
 /* ---------- tab bar ---------- */
 nav {
   flex: none;
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   background: var(--surface); border-top: 1px solid var(--line);
   padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 nav button {
-  min-height: 64px; border: 0; background: transparent; color: var(--muted);
-  font-size: 1.05rem; font-weight: 700; letter-spacing: .02em;
+  min-height: 64px; border: 0; background: transparent; color: var(--muted); padding: 0 2px;
+  font-size: .98rem; font-weight: 700; white-space: nowrap;
   border-top: 4px solid transparent;
 }
 nav button[aria-selected="true"] { color: var(--text); border-top-color: var(--accent); }
@@ -299,6 +299,55 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   font-weight: 600; font-size: .95rem; opacity: 0; pointer-events: none; transition: opacity .2s;
 }
 #toast.show { opacity: 1; }
+
+/* ---------- diagnose ---------- */
+.dsteps { margin: 8px 0 0; padding: 0; list-style: none; }
+.dsteps li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: .92rem; }
+.dsteps li .sec { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dsteps li.off { opacity: .45; text-decoration: line-through; }
+.dsegs { display: grid; gap: 4px; }
+.dseg { height: 14px; border-radius: 3px; background: var(--surface2); border: 1px solid var(--line); }
+.dseg.done { background: var(--ok); border-color: var(--ok); }
+.dseg.cur { background: var(--accent); border-color: var(--accent); }
+.dlabel { font-size: 1.55rem; font-weight: 800; line-height: 1.15; }
+.dtext { font-size: 1.2rem; font-weight: 600; margin-top: 8px; line-height: 1.3; }
+.countdown {
+  text-align: center; font-size: min(34vw, 20vh); line-height: 1; font-weight: 800;
+  font-variant-numeric: tabular-nums; letter-spacing: -.03em;
+}
+.countdown.ready { color: var(--warn); }
+.countdown-sub { text-align: center; color: var(--muted); font-weight: 700; margin-top: -6px; }
+.recinfo { font-family: var(--mono); font-size: .85rem; color: var(--muted); min-height: 1.2em; }
+#diagRun, #diagIdle { display: flex; flex-direction: column; gap: 12px; }
+.bar { height: 18px; border-radius: 9px; background: var(--surface2); border: 1px solid var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s linear; }
+.dump-text { font-size: 1.1rem; font-weight: 700; margin: 10px 0 6px; }
+.btn.secondary { background: var(--surface); }
+.linkbtn { background: none; border: 0; color: var(--accent); font-weight: 700; min-height: 48px; padding: 0 4px; text-decoration: underline; }
+
+/* ---------- saved runs ---------- */
+.rec-item { border-top: 1px solid var(--line); padding: 12px 0 4px; }
+.rec-item:first-child { border-top: 0; }
+.rec-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.rec-title { font-weight: 800; }
+.rec-date { color: var(--muted); font-size: .88rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rec-sum { font-size: .92rem; margin: 4px 0 8px; }
+.rec-sum .tag { color: var(--warn); font-weight: 700; }
+.rec-acts { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+.rec-acts .btn { min-height: 56px; padding: 4px; font-size: .92rem; line-height: 1.1; }
+#copySheet {
+  position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.6);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+#copySheet .sheet {
+  width: 100%; max-width: 640px; background: var(--surface); border-top-left-radius: 18px; border-top-right-radius: 18px;
+  padding: 16px var(--pad-r) calc(16px + env(safe-area-inset-bottom)) var(--pad-l);
+  display: flex; flex-direction: column; gap: 10px; max-height: 85vh;
+}
+#copySheet textarea {
+  width: 100%; min-height: 40vh; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+  font-family: var(--mono); font-size: .78rem; padding: 10px; resize: none;
+}
 
 @media (orientation: landscape) and (max-height: 540px) {
   #view-ride.active { display: grid; grid-template-columns: 1.1fr 1fr; grid-template-rows: auto 1fr; }
@@ -337,6 +386,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       <span class="chip" id="chipV"><span class="k">V</span>Calibrated</span>
       <span class="chip bad" id="chipS" hidden><span class="k">S</span>Saturated</span>
       <span class="chip warn" id="chipH" hidden><span class="k">H</span><span id="chipHText">Off-path hold</span></span>
+      <span class="chip bad" id="chipG" hidden><span class="k">G</span>Recording</span>
+      <span class="chip warn" id="chipY" hidden><span class="k">Y</span>Sending recording</span>
     </div>
     <div class="gear-wrap">
       <div class="gear-label">GEAR</div>
@@ -366,6 +417,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
         </ol>
         <p class="muted small">With auto-capture on, each point is taken once the reading has held steady for about 2 seconds. Otherwise tap CAPTURE.</p>
         <button class="btn primary big" id="calStart" type="button" style="margin-top:12px">Start calibration</button>
+        <button class="btn secondary" id="saveStored" type="button" style="margin-top:10px; width:100%">Save stored calibration</button>
+        <p class="small muted" style="margin:8px 0 0">Every finished calibration is saved on this phone automatically. <button class="linkbtn" type="button" id="goSaved">See saved runs</button></p>
       </div>
     </div>
 
@@ -408,11 +461,60 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     </div>
   </section>
 
+  <!-- DIAGNOSE -->
+  <section class="view" id="view-diag" aria-label="Diagnose">
+    <div class="card result" id="diagResult" hidden></div>
+
+    <div id="diagIdle">
+      <div class="card">
+        <h2>Diagnostic run</h2>
+        <p class="muted small">A guided recording of the raw magnetometer field while you move the lever, turn the crank and pedal. The bridge records 25 samples a second; afterwards the page downloads the recording and saves it on this phone. Needs firmware v2 with recording.</p>
+        <ol class="dsteps" id="diagStepList"></ol>
+        <p class="small muted" id="diagTotal" style="margin:8px 0 0"></p>
+        <button class="switch-row" id="leanToggle" type="button" role="switch" aria-checked="true" style="margin-top:12px">
+          <span><span class="t">Include the lean step</span><br><span class="s">Leaning on the bars, sitting up, leaning back</span></span>
+          <span class="switch" aria-hidden="true"></span>
+        </button>
+        <button class="btn primary big" id="diagStart" type="button" style="margin-top:12px">Start diagnostic run</button>
+      </div>
+    </div>
+
+    <div id="diagRun" hidden>
+      <div class="cal-point" id="dStepNo">Step 1 of 11</div>
+      <div class="dsegs" id="dSegs" aria-hidden="true"></div>
+      <div class="recinfo" id="dRec"></div>
+      <div class="prompt" aria-live="polite">
+        <div class="dlabel" id="dLabel"></div>
+        <div class="dtext" id="dText"></div>
+      </div>
+      <div id="dTimer">
+        <div class="countdown" id="dCount">0</div>
+        <div class="countdown-sub" id="dCountSub">seconds</div>
+      </div>
+      <div class="cal-btns" id="dNav">
+        <button class="btn" id="dBack" type="button">BACK</button>
+        <button class="btn primary" id="dNext" type="button">NEXT</button>
+      </div>
+      <div id="dDump" hidden>
+        <div class="dump-text" id="dDumpText">Downloading recording...</div>
+        <div class="bar"><i id="dBar"></i></div>
+        <div class="small muted" id="dDumpSub" style="margin-top:6px"></div>
+      </div>
+      <button class="btn danger" id="dCancel" type="button" style="width:100%">CANCEL</button>
+    </div>
+
+    <div class="card" id="savedCard">
+      <h2>Saved runs</h2>
+      <div class="small muted" id="savedInfo"></div>
+      <div id="savedList"></div>
+    </div>
+  </section>
+
   <!-- CONSOLE -->
   <section class="view" id="view-console" aria-label="Console">
     <div class="log" id="log" role="log" aria-live="off"></div>
     <button class="switch-row" id="rawToggle" type="button" role="switch" aria-checked="false">
-      <span><span class="t">Show machine lines</span><br><span class="s">S, C, K, A, U lines as received</span></span>
+      <span><span class="t">Show machine lines</span><br><span class="s">S, C, K, A, U, Q, G, M, Y lines; first 10 D lines per transfer</span></span>
       <span class="switch" aria-hidden="true"></span>
     </button>
     <div class="qbtns">
@@ -432,10 +534,19 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
 <nav role="tablist" aria-label="Views">
   <button type="button" role="tab" data-view="ride" aria-selected="true">Ride</button>
   <button type="button" role="tab" data-view="cal" aria-selected="false">Calibrate<span class="badge" id="calBadge" hidden></span></button>
+  <button type="button" role="tab" data-view="diag" aria-selected="false">Diagnose<span class="badge" id="diagBadge" hidden></span></button>
   <button type="button" role="tab" data-view="console" aria-selected="false">Console</button>
 </nav>
 
 <div id="toast" role="status"></div>
+
+<div id="copySheet" hidden>
+  <div class="sheet" role="dialog" aria-label="Copy CSV">
+    <div class="cal-head"><b id="copyTitle">Copy</b><button class="x-btn" type="button" id="copyClose" aria-label="Close">×</button></div>
+    <div class="small muted">Copying was blocked. The text is selected below; use your phone's Copy.</div>
+    <textarea id="copyText" readonly></textarea>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -458,6 +569,25 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   try { params = new URLSearchParams(location.search); } catch (e) { params = { get: function () { return null; } }; }
   var DEMO = params.get('demo') === '1';
   var DEMO_UNCAL = params.get('uncal') === '1';
+  var DEMO_DROP = params.get('drop') === '1';       // demo: drop one D line in the first transfer
+  var DEMO_OLDFW = params.get('oldfw') === '1';     // demo: act like firmware without k/g/m/e/y
+  var FAST = params.get('fast') === '1' ? 5 : 1;    // divide diagnostic step times by 5
+
+  var DIAG_STEPS = [
+    { label: 'Hands off — lever down', text: "Push the lever all the way down. Don't touch the bike.", secs: 8 },
+    { label: 'Sweep up', text: 'Slowly push the lever all the way up.', secs: 15 },
+    { label: 'Hold at top', text: 'Leave the lever all the way up.', secs: 5 },
+    { label: 'Sweep down', text: 'Slowly bring the lever all the way down.', secs: 15 },
+    { label: 'Hold at bottom', text: 'Leave the lever all the way down.', secs: 5 },
+    { label: 'Slow crank turn', text: 'Lever down. Turn the crank slowly by hand through one full revolution, pausing at each quarter.', secs: 20 },
+    { label: 'Set middle gear', text: 'Pedal and set the lever so the console shows about gear 10–12.', secs: 15 },
+    { label: 'Pedal easy', text: 'Pedal easy and steady, about 60 rpm.', secs: 20 },
+    { label: 'Pedal fast', text: 'Pedal fast, 90–100 rpm.', secs: 20 },
+    { label: 'Stop', text: 'Stop pedalling. Sit still on the saddle.', secs: 15 },
+    { label: 'Lean', text: 'Lean forward onto the bars 5 s, sit up 5 s, lean back 5 s.', secs: 15, optional: true }
+  ];
+  var MAX_MARKERS = 32;
+  var D_RAW_SHOWN = 10;
 
   function $(id) { return document.getElementById(id); }
 
@@ -470,9 +600,33 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     sAt: 0,              // time of last S line
     prevCal: 0,
     points: [],          // [{point, x, y, z}]
-    result: null,        // {type:'K', ok, span, minstep, minAt, msg} | {type:'A', reason}
+    result: null,        // {type:'K', ok, span, minstep, minAt, msg, recordId} | {type:'A', reason}
     showRaw: false,
-    view: 'ride'
+    view: 'ride',
+    q: null              // collecting Q lines: {points:[], timer}
+  };
+
+  // Diagnostic run state
+  var diag = {
+    phase: 'idle',       // idle | starting | countdown | running | stopping | dumping | done | incomplete | error | interrupted
+    lean: true,
+    steps: [],
+    idx: 0,
+    endAt: 0,
+    cdEnd: 0,
+    lastCd: 0,
+    tick: 0,
+    sent: 0,             // markers sent since 'g'
+    labelByK: {},        // marker k -> step label
+    capacity: 12000,
+    period: 40,
+    startedAt: 0,
+    gstop: null,
+    full: false,
+    msg: '',
+    startTO: 0, stopTO: 0, dumpTO: 0,
+    dump: null,
+    recordId: null
   };
 
   // ===================================================================
@@ -522,10 +676,26 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   // ===================================================================
   // Line parser
   // ===================================================================
-  var MACHINE_RE = /^([SCKAU]),/;
+  var MACHINE_RE = /^([SCKAUQGMYD]),/;
 
   function handleLine(raw) {
-    var line = String(raw).replace(/[\r\0]/g, '').replace(/\s+$/, '');
+    var line = raw;
+    var L = line.length;
+    if (L && line.charCodeAt(L - 1) === 13) line = line.slice(0, L - 1);
+    // Fast path for D lines: a recording dump is thousands of them.
+    if (line.charCodeAt(0) === 68 && line.charCodeAt(1) === 44) {
+      var dok = false;
+      try { dok = onD(line); } catch (e) { dok = false; }
+      var dd = diag.dump;
+      if (!dok) { if (!dd || dd.badLogged++ < 5) logLine(line + '   (malformed, ignored)', 'rawbad'); }
+      else if (state.showRaw && dd && dd.rawShown < D_RAW_SHOWN) {
+        dd.rawShown++;
+        logLine(line, 'raw');
+        if (dd.rawShown === D_RAW_SHOWN) logLine('(further D lines of this transfer not shown)', 'raw');
+      }
+      return;
+    }
+    line = line.replace(/[\r\0]/g, '').replace(/\s+$/, '');
     if (!line.trim()) return;
     var m = MACHINE_RE.exec(line);
     if (!m) { logLine(line, 'human'); return; }
@@ -538,6 +708,10 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
         case 'K': ok = onK(parts); break;
         case 'A': ok = onA(parts); break;
         case 'U': ok = onU(parts); break;
+        case 'Q': ok = onQ(parts); break;
+        case 'G': ok = onG(parts); break;
+        case 'M': ok = onM(parts); break;
+        case 'Y': ok = onY(parts); break;
       }
     } catch (e) { console.warn('parse error', line, e); ok = false; }
     if (state.showRaw || !ok) logLine(ok ? line : line + '   (malformed, ignored)', ok ? 'raw' : 'rawbad');
@@ -564,7 +738,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       stab: fin(stab) ? Math.max(0, Math.min(100, stab)) : 0,
       off: num(p[8]),
       flags: flags,
-      flagStr: flagStr
+      flagStr: flagStr,
+      rec: int(p[10])      // optional 11th field: samples recorded so far
     };
     var prevCal = state.s ? state.s.cal : 0;
     state.s = s;
@@ -603,6 +778,9 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       ? 'Calibration saved: span ' + fmt(r.span, 1) + ' µT, smallest step ' + fmt(r.minstep, 1) + ' µT at gear ' + (fin(r.minAt) ? r.minAt : '?')
       : 'Calibration rejected: ' + (r.msg || 'no reason given'), 'sys');
     try { if (navigator.vibrate) navigator.vibrate(r.ok ? [60, 60, 60] : [300]); } catch (e) {}
+    try {
+      r.recordId = saveCalRecord('run', r, state.points);
+    } catch (e) { console.warn('save failed', e); }
     renderResult();
     renderBadge();
     return true;
@@ -636,6 +814,786 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     state.result = null;
     renderPoints();
     renderResult();
+  }
+
+  // ===================================================================
+  // Q: stored calibration (reply to 'k')
+  // Q,<point>,<x>,<y>,<z> ... Q,end,<span>,<minstep>,<minstepAt>   or   Q,none
+  // ===================================================================
+  function requestStoredCal() {
+    if (state.conn !== 'connected') { toast('Not connected'); return; }
+    if (state.q) clearTimeout(state.q.timer);
+    state.q = { points: [], timer: 0 };
+    state.q.timer = setTimeout(function () {
+      if (state.q) { state.q = null; toast('No reply. The bridge may need firmware v2.'); }
+    }, 10000);
+    send('k');
+  }
+
+  function onQ(p) {
+    var kind = (p[1] || '').trim();
+    if (kind === 'none') {
+      if (state.q) clearTimeout(state.q.timer);
+      state.q = null;
+      toast('No calibration stored');
+      return true;
+    }
+    if (kind === 'end') {
+      var q = state.q;
+      if (q) clearTimeout(q.timer);
+      state.q = null;
+      if (!q || !q.points.length) return true; // stray end without points
+      var info = { ok: true, span: num(p[2]), minstep: num(p[3]), minAt: int(p[4]), msg: 'stored' };
+      saveCalRecord('stored', info, q.points);
+      toast('Stored calibration saved');
+      return true;
+    }
+    var point = int(kind);
+    if (!fin(point) || point < 1 || point > TOTAL_POINTS) return false;
+    if (!state.q) state.q = { points: [], timer: 0 }; // 'k' typed in the console
+    clearTimeout(state.q.timer);
+    state.q.timer = setTimeout(function () { state.q = null; }, 10000);
+    state.q.points = state.q.points.filter(function (x) { return x.point !== point; });
+    state.q.points.push({ point: point, x: num(p[2]), y: num(p[3]), z: num(p[4]) });
+    return true;
+  }
+
+  // ===================================================================
+  // G / M / Y / D: diagnostics recording
+  // ===================================================================
+  function onG(p) {
+    var kind = (p[1] || '').trim();
+    if (kind === 'start') {
+      var cap = int(p[2]), per = int(p[3]);
+      if (fin(cap) && cap > 0) diag.capacity = cap;
+      if (fin(per) && per > 0) diag.period = per;
+      logLine('Recording started (capacity ' + diag.capacity + ' samples, ' + diag.period + ' ms).', 'sys');
+      if (diag.phase === 'starting') {
+        clearTimeout(diag.startTO);
+        diag.startedAt = Date.now();
+        beginCountdown();
+      }
+      return true;
+    }
+    if (kind === 'stop' || kind === 'full') {
+      diag.gstop = { count: int(p[2]), duration: int(p[3]), full: kind === 'full' };
+      logLine('Recording ' + (kind === 'full' ? 'full' : 'stopped') + ': ' + (fin(diag.gstop.count) ? diag.gstop.count : '?') +
+        ' samples, ' + (fin(diag.gstop.duration) ? (diag.gstop.duration / 1000).toFixed(1) + ' s' : '?') + '.', 'sys');
+      if (kind === 'full') {
+        diag.full = true;
+        if (diag.phase === 'running' || diag.phase === 'countdown') {
+          toast('Recording memory full. Downloading.');
+          clearDiagTimers();
+          requestDump();
+          return true;
+        }
+      }
+      if (diag.phase === 'stopping') requestDump();
+      return true;
+    }
+    return false;
+  }
+
+  function onM(p) {
+    var k = int(p[1]), idx = int(p[2]);
+    return fin(k) && fin(idx) && k >= 1 && idx >= 0;
+  }
+
+  function onY(p) {
+    var kind = (p[1] || '').trim();
+    var d = diag.dump;
+    if (kind !== 'begin' && kind !== 'm' && kind !== 'end') return false;
+    if (diag.phase !== 'dumping' || !d) return true; // not expecting a transfer: ignore
+    d.lastAt = Date.now();
+    if (kind === 'begin') {
+      var count = int(p[2]);
+      if (!fin(count) || count < 0) return false;
+      d.begun = true;
+      d.count = count;
+      d.period = int(p[3]) > 0 ? int(p[3]) : diag.period;
+      d.nMarkers = int(p[4]) >= 0 ? int(p[4]) : 0;
+      d.markers = []; d.x = []; d.y = []; d.z = []; d.r = []; d.dt = []; d.bad = 0; d.rawShown = 0;
+      scheduleDumpRender();
+      return true;
+    }
+    if (kind === 'm') {
+      var k = int(p[2]), idx = int(p[3]);
+      if (!fin(k) || !fin(idx)) return false;
+      d.markers.push({ k: k, index: idx });
+      return true;
+    }
+    d.endCount = int(p[2]);
+    d.checksum = int(p[3]);
+    verifyDump();
+    return true;
+  }
+
+  function onD(line) {
+    var d = diag.dump;
+    if (diag.phase !== 'dumping' || !d || !d.begun) return true; // not expecting: ignore quietly
+    var p = line.split(',');
+    if (p.length < 6 || p[1] === '' || p[2] === '' || p[3] === '' || p[4] === '' || p[5] === '') { d.bad++; return false; }
+    var x = +p[1], y = +p[2], z = +p[3], r = +p[4], dt = +p[5];
+    if (x !== x || y !== y || z !== z || r !== r || dt !== dt) { d.bad++; return false; }
+    d.x.push(x); d.y.push(y); d.z.push(z); d.r.push(r); d.dt.push(dt);
+    if ((d.x.length & 63) === 0) { d.lastAt = Date.now(); scheduleDumpRender(); }
+    return true;
+  }
+
+  // ===================================================================
+  // Diagnostic run flow
+  // ===================================================================
+  function diagSteps() { return DIAG_STEPS.filter(function (s) { return !s.optional || diag.lean; }); }
+  function stepMs(s) { return Math.round(s.secs * 1000 / FAST); }
+
+  function clearDiagTimers() {
+    clearTimeout(diag.startTO); clearTimeout(diag.stopTO); clearTimeout(diag.dumpTO);
+    clearInterval(diag.tick); diag.tick = 0;
+  }
+
+  function setDiagPhase(ph) {
+    diag.phase = ph;
+    renderDiag();
+    render();
+  }
+
+  function diagStart() {
+    if (state.conn !== 'connected') { toast('Not connected'); return; }
+    unlockAudio();
+    clearDiagTimers();
+    diag.steps = diagSteps();
+    diag.idx = 0; diag.sent = 0; diag.labelByK = {}; diag.gstop = null; diag.full = false;
+    diag.dump = null; diag.recordId = null; diag.msg = ''; diag.startedAt = 0;
+    setDiagPhase('starting');
+    send('g');
+    diag.startTO = setTimeout(function () {
+      if (diag.phase === 'starting') diagFail("Firmware doesn't support recording — update to v2");
+    }, 3000);
+  }
+
+  function diagFail(msg) {
+    clearDiagTimers();
+    diag.msg = msg;
+    setDiagPhase('error');
+  }
+
+  function beginCountdown() {
+    diag.cdEnd = Date.now() + 3000;
+    diag.lastCd = 0;
+    setDiagPhase('countdown');
+    startTick();
+  }
+
+  function startTick() {
+    clearInterval(diag.tick);
+    diag.tick = setInterval(diagTick, 200);
+    diagTick();
+  }
+
+  function diagTick() {
+    var now = Date.now();
+    if (diag.phase === 'countdown') {
+      var left = diag.cdEnd - now;
+      if (left <= 0) { diag.phase = 'running'; goStep(0); return; }
+      var sec = Math.ceil(left / 1000);
+      if (sec !== diag.lastCd) { diag.lastCd = sec; beep(660, 80, 1); }
+      renderDiagRun();
+      return;
+    }
+    if (diag.phase === 'running') {
+      if (now >= diag.endAt) { nextStep(); return; }
+      renderDiagRun();
+    }
+  }
+
+  function goStep(i) {
+    if (diag.sent >= MAX_MARKERS) { toast('Marker limit reached (' + MAX_MARKERS + ')'); return; }
+    diag.idx = i;
+    diag.endAt = Date.now() + stepMs(diag.steps[i]);
+    send('m');
+    diag.sent++;
+    diag.labelByK[diag.sent] = diag.steps[i].label;
+    beep(880, 150, 1);
+    renderDiag();
+  }
+
+  function nextStep() {
+    if (diag.idx < diag.steps.length - 1) goStep(diag.idx + 1);
+    else finishRun();
+  }
+
+  function finishRun() {
+    clearInterval(diag.tick); diag.tick = 0;
+    beep(880, 120, 2);
+    setDiagPhase('stopping');
+    send('e');
+    diag.stopTO = setTimeout(function () { if (diag.phase === 'stopping') requestDump(); }, 4000);
+  }
+
+  function requestDump() {
+    if (state.conn !== 'connected') { toast('Not connected'); return; }
+    clearDiagTimers();
+    diag.dump = {
+      begun: false, count: 0, period: diag.period, nMarkers: 0, markers: [],
+      x: [], y: [], z: [], r: [], dt: [], bad: 0, badLogged: 0, rawShown: 0,
+      endCount: null, checksum: null, lastAt: Date.now(), requestedAt: Date.now()
+    };
+    diag.msg = '';
+    setDiagPhase('dumping');
+    send('y');
+    armDumpWatch();
+  }
+
+  function armDumpWatch() {
+    clearTimeout(diag.dumpTO);
+    diag.dumpTO = setTimeout(function () {
+      var d = diag.dump;
+      if (diag.phase !== 'dumping' || !d) return;
+      var idle = Date.now() - d.lastAt;
+      if (!d.begun && idle > 10000) dumpIncomplete('No reply to the download request.');
+      else if (d.begun && idle > 8000) dumpIncomplete('Transfer stalled after ' + d.x.length + ' of ' + d.count + ' samples.');
+      else armDumpWatch();
+    }, 1000);
+  }
+
+  function dumpIncomplete(reason) {
+    clearTimeout(diag.dumpTO);
+    diag.msg = reason;
+    setDiagPhase('incomplete');
+    beep(330, 300, 1);
+  }
+
+  function checksumOf(d) {
+    var sum = 0, n = d.x.length;
+    for (var i = 0; i < n; i++) sum += d.x[i] + d.y[i] + d.z[i];
+    return ((sum % 65536) + 65536) % 65536;
+  }
+
+  function verifyDump() {
+    var d = diag.dump;
+    clearTimeout(diag.dumpTO);
+    if (!d.begun) { dumpIncomplete('The transfer ended before it began.'); return; }
+    var n = d.x.length;
+    var cs = checksumOf(d);
+    d.computed = cs;
+    var problems = [];
+    if (n !== d.count) problems.push('received ' + n + ' of ' + d.count + ' samples');
+    if (d.endCount !== d.count) problems.push('end count ' + d.endCount + ' does not match ' + d.count);
+    if (d.bad) problems.push(d.bad + ' malformed lines');
+    if (d.markers.length !== d.nMarkers) problems.push('received ' + d.markers.length + ' of ' + d.nMarkers + ' markers');
+    if (cs !== d.checksum) problems.push('checksum ' + cs + ' does not match ' + d.checksum);
+    if (problems.length) {
+      logLine('Transfer check failed: ' + problems.join('; '), 'bad');
+      dumpIncomplete('Transfer incomplete: ' + problems.join('; ') + '.');
+      return;
+    }
+    logLine('Transfer OK: ' + n + ' samples, checksum ' + cs + '.', 'sys');
+    try { diag.recordId = saveDiagRecord(d); } catch (e) { console.warn(e); diag.recordId = null; }
+    setDiagPhase('done');
+    beep(1047, 120, 2);
+  }
+
+  function diagCancel() {
+    var ph = diag.phase;
+    clearDiagTimers();
+    if ((ph === 'starting' || ph === 'countdown' || ph === 'running' || ph === 'stopping') && state.conn === 'connected') send('e');
+    diag.dump = null;
+    setDiagPhase('idle');
+    toast('Diagnostic run discarded');
+  }
+
+  function diagOnDisconnect() {
+    var ph = diag.phase;
+    if (ph === 'starting' || ph === 'countdown' || ph === 'running' || ph === 'stopping') {
+      clearDiagTimers();
+      diag.msg = 'The connection dropped during the run. The bridge keeps what it recorded until the next start; reconnect and tap Download recording to fetch it.';
+      setDiagPhase('interrupted');
+    } else if (ph === 'dumping') {
+      dumpIncomplete('The connection dropped during the transfer. Reconnect, then tap Retry.');
+    }
+  }
+
+  var dumpRenderPending = false;
+  function scheduleDumpRender() {
+    if (dumpRenderPending) return;
+    dumpRenderPending = true;
+    setTimeout(function () { dumpRenderPending = false; renderDiagRun(); }, 120);
+  }
+
+  // ---- beeps and vibration at step changes ----
+  var audioCtx = null;
+  function unlockAudio() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!audioCtx && AC) audioCtx = new AC();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) {}
+  }
+  function beep(freq, ms, count) {
+    try { if (navigator.vibrate) navigator.vibrate(count > 1 ? [ms, 80, ms] : ms); } catch (e) {}
+    if (!audioCtx) return;
+    try {
+      var t0 = audioCtx.currentTime;
+      for (var i = 0; i < (count || 1); i++) {
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        var st = t0 + i * (ms + 80) / 1000;
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(0.0001, st);
+        g.gain.exponentialRampToValueAtTime(0.25, st + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, st + ms / 1000);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(st); o.stop(st + ms / 1000 + 0.02);
+      }
+    } catch (e) {}
+  }
+
+  // ===================================================================
+  // Saved records (localStorage, ~4 MB cap, oldest dropped first)
+  // ===================================================================
+  var STORE_IDX = 'm3bridge.records';
+  var STORE_PREFIX = 'm3bridge.rec.';
+  var STORE_CAP = 4 * 1024 * 1024;   // characters
+  var records = [];                  // newest first: {id, type, source, ts, title, summary, filename, size, persisted}
+  var memCsv = {};                   // id -> csv (this session)
+
+  function loadRecords() {
+    try {
+      var j = localStorage.getItem(STORE_IDX);
+      var a = j ? JSON.parse(j) : [];
+      records = Array.isArray(a) ? a.filter(function (r) { return r && r.id && r.filename; }) : [];
+      records.forEach(function (r) { r.persisted = true; });
+    } catch (e) { records = []; }
+  }
+  function saveIndex() {
+    try {
+      localStorage.setItem(STORE_IDX, JSON.stringify(records.filter(function (r) { return r.persisted; })));
+      return true;
+    } catch (e) { return false; }
+  }
+  function getCsv(id) {
+    if (memCsv[id]) return memCsv[id];
+    try { return localStorage.getItem(STORE_PREFIX + id); } catch (e) { return null; }
+  }
+  function findRecord(id) {
+    for (var i = 0; i < records.length; i++) if (records[i].id === id) return records[i];
+    return null;
+  }
+  function oldestPersisted(except) {
+    for (var i = records.length - 1; i >= 0; i--) if (records[i].persisted && records[i] !== except) return records[i];
+    return null;
+  }
+  function removeRecord(r) {
+    try { localStorage.removeItem(STORE_PREFIX + r.id); } catch (e) {}
+    delete memCsv[r.id];
+    records = records.filter(function (x) { return x !== r; });
+  }
+  function storedTotal(except) {
+    var t = 0;
+    records.forEach(function (r) { if (r.persisted && r !== except) t += r.size || 0; });
+    return t;
+  }
+
+  function addRecord(meta, csv) {
+    // keep filenames unique when two records land in the same minute
+    var base = meta.filename.replace(/\.csv$/, ''), name = meta.filename, n = 2;
+    while (records.some(function (r) { return r.filename === name; })) name = base + '-' + (n++) + '.csv';
+    meta.filename = name;
+    meta.size = csv.length;
+    meta.persisted = false;
+    memCsv[meta.id] = csv;
+    records.unshift(meta);
+    var dropped = [];
+    if (meta.size <= STORE_CAP) {
+      while (storedTotal(meta) + meta.size > STORE_CAP) {
+        var old = oldestPersisted(meta);
+        if (!old) break;
+        removeRecord(old); dropped.push(old);
+      }
+      for (var attempt = 0; attempt < 50; attempt++) {
+        try {
+          localStorage.setItem(STORE_PREFIX + meta.id, csv);
+          meta.persisted = true;
+          break;
+        } catch (e) {
+          var o = oldestPersisted(meta);
+          if (!o) break;
+          removeRecord(o); dropped.push(o);
+        }
+      }
+    }
+    if (meta.persisted && !saveIndex()) {
+      // index could not be written: undo so storage stays consistent
+      try { localStorage.removeItem(STORE_PREFIX + meta.id); } catch (e) {}
+      meta.persisted = false;
+      saveIndex();
+    }
+    if (dropped.length) {
+      var msg = 'Storage full: removed ' + dropped.length + ' oldest saved run' + (dropped.length > 1 ? 's' : '') +
+        ' (' + dropped.map(function (d) { return d.filename; }).join(', ') + ').';
+      logLine(msg, 'sys');
+      toast('Storage full: removed oldest saved run');
+    }
+    if (!meta.persisted) {
+      logLine('Could not keep ' + meta.filename + ' on this device. Export it before closing the page.', 'bad');
+      toast('Not saved on this device. Export it now.');
+    }
+    renderSaved();
+    return meta.id;
+  }
+
+  // ---- CSV helpers ----
+  function csvCell(v) {
+    v = v === undefined || v === null ? '' : String(v);
+    return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+  function ascii(s) {
+    return String(s).replace(/[–—]/g, '-').replace(/µ/g, 'u').replace(/[\r\n]+/g, ' ');
+  }
+  function z2(n) { return (n < 10 ? '0' : '') + n; }
+  function fileStamp(d) {
+    return d.getFullYear() + '-' + z2(d.getMonth() + 1) + '-' + z2(d.getDate()) + '-' + z2(d.getHours()) + z2(d.getMinutes());
+  }
+  function newId(d) { return d.getTime().toString(36) + Math.floor(Math.random() * 1296).toString(36); }
+  function dist3(a, b) {
+    if (!a || !b || !fin(a.x) || !fin(a.y) || !fin(a.z) || !fin(b.x) || !fin(b.y) || !fin(b.z)) return NaN;
+    return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2) + Math.pow(a.z - b.z, 2));
+  }
+  function mmss(ms) {
+    var s = Math.max(0, Math.round(ms / 1000));
+    return Math.floor(s / 60) + ':' + z2(s % 60);
+  }
+
+  function saveCalRecord(source, info, pointsIn) {
+    var d = new Date();
+    var pts = pointsIn.slice().sort(function (a, b) { return a.point - b.point; });
+    var stored = source === 'stored';
+    var result = stored ? 'stored' : (info.ok ? 'saved' : 'rejected');
+    var lines = [
+      '# Keiser M3 Bridge calibration',
+      '# record: calibration',
+      '# source: ' + (stored ? 'stored (read back from the bridge with k)' : 'calibration run'),
+      '# timestamp: ' + d.toISOString(),
+      '# result: ' + result,
+      '# span_uT: ' + fmt(info.span, 1),
+      '# minstep_uT: ' + fmt(info.minstep, 1),
+      '# minstep_at_gear: ' + (fin(info.minAt) ? info.minAt : ''),
+      '# message: ' + ascii(info.msg || ''),
+      '# points: ' + pts.length + ' of ' + TOTAL_POINTS,
+      '# labels: point 1 = lever all the way down (Bottom); points 2-24 = where the console first shows that gear; point 25 = lever all the way up (Top)',
+      'point,label,x_uT,y_uT,z_uT,dist_prev_uT'
+    ];
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      var prev = i > 0 && pts[i - 1].point === p.point - 1 ? pts[i - 1] : null;
+      var dd = dist3(p, prev);
+      lines.push([p.point, pointLabel(p.point), fmt(p.x, 1), fmt(p.y, 1), fmt(p.z, 1), fin(dd) ? dd.toFixed(2) : '']
+        .map(function (v) { return csvCell(v === '--' ? '' : v); }).join(','));
+    }
+    var title = stored ? 'Stored calibration' : (info.ok ? 'Calibration saved' : 'Calibration rejected');
+    var summary = 'Span ' + fmt(info.span, 1) + ' µT · smallest step ' + fmt(info.minstep, 1) + ' µT' +
+      (fin(info.minAt) ? ' at gear ' + info.minAt : '') + ' · ' + pts.length + ' points' +
+      (!stored && !info.ok && info.msg ? ' · ' + info.msg : '');
+    return addRecord({
+      id: newId(d), type: 'cal', source: source, ts: d.toISOString(), title: title, summary: summary,
+      filename: 'keiser-cal-' + fileStamp(d) + '.csv'
+    }, lines.join('\n') + '\n');
+  }
+
+  function saveDiagRecord(dump) {
+    var d = new Date();
+    var n = dump.x.length;
+    var markers = dump.markers.slice().sort(function (a, b) { return a.index - b.index || a.k - b.k; });
+    var t = new Array(n), acc = 0;
+    for (var i = 0; i < n; i++) { acc += i === 0 ? 0 : dump.dt[i]; t[i] = acc; }
+    function labelFor(k) { return diag.labelByK[k] || ('marker ' + k); }
+    var lines = [
+      '# Keiser M3 Bridge diagnostic recording',
+      '# record: diagnostic',
+      '# timestamp: ' + d.toISOString(),
+      '# samples: ' + n,
+      '# period_ms: ' + dump.period,
+      '# duration_ms: ' + (n ? t[n - 1] : 0),
+      '# checksum: ' + dump.checksum + ' (verified)',
+      '# firmware: ' + (diag.gstop ? (diag.gstop.full ? 'G,full' : 'G,stop') + ' count=' + diag.gstop.count + ' duration_ms=' + diag.gstop.duration : 'no G,stop seen'),
+      '# lean_step: ' + (diag.lean ? 'yes' : 'no') + (FAST > 1 ? '; fast mode (step times / ' + FAST + ')' : ''),
+      '# units: x/y/z in uT (raw, 0.1 uT resolution); t_ms cumulative from dt; revs empty when no cadence pod',
+      '# markers: k,index,t_ms,step'
+    ];
+    markers.forEach(function (m) {
+      lines.push('# ' + m.k + ',' + m.index + ',' + (m.index < n ? t[m.index] : '') + ',' + csvCell(ascii(labelFor(m.k))));
+    });
+    lines.push('i,t_ms,step,x_uT,y_uT,z_uT,revs');
+    var mi = 0, cur = '';
+    for (var j = 0; j < n; j++) {
+      while (mi < markers.length && markers[mi].index <= j) { cur = csvCell(ascii(labelFor(markers[mi].k))); mi++; }
+      var r = dump.r[j];
+      lines.push(j + ',' + t[j] + ',' + cur + ',' + (dump.x[j] / 10).toFixed(1) + ',' + (dump.y[j] / 10).toFixed(1) + ',' +
+        (dump.z[j] / 10).toFixed(1) + ',' + (r === -1 ? '' : r));
+    }
+    var summary = n + ' samples · ' + mmss(n ? t[n - 1] : 0) + ' · ' + markers.length + (markers.length === 1 ? ' step marker' : ' step markers') + ' · checksum OK' +
+      (diag.full ? ' · memory filled' : '');
+    return addRecord({
+      id: newId(d), type: 'diag', source: 'run', ts: d.toISOString(), title: 'Diagnostic run', summary: summary,
+      filename: 'keiser-diag-' + fileStamp(d) + '.csv'
+    }, lines.join('\n') + '\n');
+  }
+
+  // ---- export actions ----
+  // Share is shown when the browser can share a file, or at least text.
+  function canShare() {
+    if (!navigator.share) return false;
+    return true;
+  }
+
+  function recActionsHtml(id) {
+    return '<div class="rec-acts">' +
+      (canShare() ? '<button class="btn" type="button" data-rec-act="share" data-id="' + id + '">Share</button>' : '') +
+      '<button class="btn" type="button" data-rec-act="download" data-id="' + id + '">Download</button>' +
+      '<button class="btn" type="button" data-rec-act="copy" data-id="' + id + '">Copy</button>' +
+      '<button class="btn danger" type="button" data-rec-act="delete" data-id="' + id + '">Delete</button>' +
+      '</div>';
+  }
+
+  function doRecAction(act, id, btn) {
+    var rec = findRecord(id);
+    if (!rec) { toast('That record is gone'); renderSaved(); return; }
+    if (act === 'delete') {
+      twoTap(btn, 'Tap again', function () {
+        removeRecord(rec); saveIndex(); renderSaved(); renderResult(); renderDiag();
+        toast('Deleted');
+      });
+      return;
+    }
+    var csv = getCsv(id);
+    if (csv === null || csv === undefined) { toast('Could not read the saved data'); return; }
+    if (act === 'share') {
+      var file = null;
+      try { file = new File([csv], rec.filename, { type: 'text/csv' }); } catch (e) { file = null; }
+      var p;
+      try {
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) p = navigator.share({ files: [file], title: rec.filename });
+        else if (navigator.share) p = navigator.share({ title: rec.filename, text: csv });
+      } catch (e) { p = Promise.reject(e); }
+      if (p && p.catch) p.catch(function (err) { if (!err || err.name !== 'AbortError') toast('Share failed'); });
+      return;
+    }
+    if (act === 'download') {
+      try {
+        var url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        var a = document.createElement('a');
+        a.href = url; a.download = rec.filename; a.style.display = 'none';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 15000);
+      } catch (e) { toast('Download failed'); }
+      return;
+    }
+    if (act === 'copy') {
+      var fallback = function () { showCopySheet(csv, rec.filename); };
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(csv).then(function () { toast('Copied ' + rec.filename); }, fallback);
+        } else fallback();
+      } catch (e) { fallback(); }
+    }
+  }
+
+  function showCopySheet(text, title) {
+    $('copyTitle').textContent = title;
+    var ta = $('copyText');
+    ta.value = text;
+    $('copySheet').hidden = false;
+    try { ta.focus(); ta.select(); ta.setSelectionRange(0, text.length); } catch (e) {}
+  }
+
+  // Generic "tap twice within 3 s" confirmation.
+  function twoTap(btn, armedText, fn) {
+    var until = +(btn.getAttribute('data-armed') || 0);
+    if (Date.now() < until) { disarm(btn); fn(); return; }
+    btn.setAttribute('data-armed', String(Date.now() + 3000));
+    if (btn.getAttribute('data-label') === null) btn.setAttribute('data-label', btn.textContent);
+    btn.textContent = armedText;
+    btn.classList.add('armed');
+    clearTimeout(btn._disarmT);
+    btn._disarmT = setTimeout(function () { disarm(btn); }, 3000);
+  }
+  function disarm(btn) {
+    clearTimeout(btn._disarmT);
+    var l = btn.getAttribute('data-label');
+    if (l !== null) { btn.textContent = l; btn.removeAttribute('data-label'); }
+    btn.removeAttribute('data-armed');
+    btn.classList.remove('armed');
+  }
+
+  function fmtDate(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    var mons = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return d.getDate() + ' ' + mons[d.getMonth()] + ' ' + d.getFullYear() + ', ' + z2(d.getHours()) + ':' + z2(d.getMinutes());
+  }
+
+  function renderSaved() {
+    var list = $('savedList');
+    if (!records.length) {
+      $('savedInfo').textContent = 'Nothing saved yet. Finished calibrations and diagnostic runs appear here.';
+      list.innerHTML = '';
+      return;
+    }
+    var total = storedTotal(null);
+    $('savedInfo').textContent = records.length + ' saved · ' + (total / 1048576).toFixed(2) + ' MB of ' +
+      (STORE_CAP / 1048576).toFixed(0) + ' MB on this phone. The oldest are removed when full.';
+    list.innerHTML = records.map(function (r) {
+      return '<div class="rec-item"><div class="rec-head"><span class="rec-title">' + esc(r.title) + '</span>' +
+        '<span class="rec-date">' + esc(fmtDate(r.ts)) + '</span></div>' +
+        '<div class="rec-sum">' + esc(r.summary) + (r.persisted ? '' : ' <span class="tag">· not saved on this device</span>') +
+        '<br><span class="small muted">' + esc(r.filename) + '</span></div>' + recActionsHtml(r.id) + '</div>';
+    }).join('');
+  }
+
+  // ===================================================================
+  // Diagnose rendering
+  // ===================================================================
+  function renderDiagIdleList() {
+    var html = '', total = 0;
+    DIAG_STEPS.forEach(function (s, i) {
+      var off = s.optional && !diag.lean;
+      if (!off) total += stepMs(s);
+      html += '<li' + (off ? ' class="off"' : '') + '><span>' + (i + 1) + '. ' + esc(s.label) + (s.optional ? ' (optional)' : '') +
+        '</span><span class="sec">' + (Math.round(stepMs(s) / 100) / 10) + ' s</span></li>';
+    });
+    $('diagStepList').innerHTML = html;
+    $('diagTotal').textContent = 'About ' + mmss(total + 3000) + ' including a 3 s get-ready countdown' +
+      (FAST > 1 ? ' (fast mode: step times divided by ' + FAST + ').' : '.') + ' The bridge holds up to 8 minutes.';
+    $('leanToggle').setAttribute('aria-checked', diag.lean ? 'true' : 'false');
+  }
+
+  function renderDiag() {
+    var ph = diag.phase, connected = state.conn === 'connected';
+    var runVisible = ph === 'starting' || ph === 'countdown' || ph === 'running' || ph === 'stopping' || ph === 'dumping';
+    $('diagRun').hidden = !runVisible;
+    $('diagIdle').hidden = runVisible || ph === 'incomplete' || ph === 'interrupted';
+    $('savedCard').hidden = runVisible;
+    $('diagStart').disabled = !connected;
+    $('diagStart').textContent = connected ? 'Start diagnostic run' : 'Connect first';
+    renderDiagIdleList();
+
+    var card = $('diagResult');
+    if (ph === 'done' || ph === 'incomplete' || ph === 'error' || ph === 'interrupted') {
+      card.hidden = false;
+      var html = '';
+      if (ph === 'done') {
+        var rec = diag.recordId ? findRecord(diag.recordId) : null;
+        card.className = 'card result ok';
+        html = '<h2>Recording saved<button class="x-btn" type="button" data-diag="dismiss" aria-label="Dismiss">×</button></h2>' +
+          '<p>' + esc(rec ? rec.summary : 'Transfer OK') + '</p>' +
+          (rec ? '<p class="small muted">' + esc(rec.filename) + '</p>' + recActionsHtml(rec.id)
+            : '<p class="small">' + (diag.recordId ? 'Deleted from this phone.' : 'The record could not be saved.') + '</p>');
+      } else if (ph === 'incomplete') {
+        card.className = 'card result warn';
+        html = '<h2>Transfer incomplete</h2><p><b>' + esc(diag.msg) + '</b></p><p class="small">Tap Retry to download the recording again. The bridge still has it.</p>' +
+          '<div class="cal-btns"><button class="btn primary" type="button" data-diag="retry"' + (connected ? '' : ' disabled') + '>Retry</button>' +
+          '<button class="btn danger" type="button" data-diag="discard">Discard</button></div>';
+      } else if (ph === 'interrupted') {
+        card.className = 'card result warn';
+        html = '<h2>Run interrupted</h2><p>' + esc(diag.msg) + '</p>' +
+          '<div class="cal-btns"><button class="btn primary" type="button" data-diag="retry"' + (connected ? '' : ' disabled') + '>Download recording</button>' +
+          '<button class="btn danger" type="button" data-diag="discard">Discard</button></div>';
+      } else {
+        card.className = 'card result bad';
+        html = '<h2>Could not start<button class="x-btn" type="button" data-diag="dismiss" aria-label="Dismiss">×</button></h2><p><b>' + esc(diag.msg) + '</b></p>';
+      }
+      card.innerHTML = html;
+    } else {
+      card.hidden = true;
+      card.innerHTML = '';
+    }
+
+    if (runVisible) {
+      var segs = $('dSegs');
+      if (segs.children.length !== diag.steps.length) {
+        segs.style.gridTemplateColumns = 'repeat(' + diag.steps.length + ', minmax(0, 1fr))';
+        segs.innerHTML = '';
+        for (var i = 0; i < diag.steps.length; i++) { var s = document.createElement('div'); s.className = 'dseg'; segs.appendChild(s); }
+      }
+      disarm($('dCancel'));
+      renderDiagRun();
+    }
+  }
+
+  function renderDiagRun() {
+    var ph = diag.phase;
+    if ($('diagRun').hidden) return;
+    var n = diag.steps.length;
+    var stepPhase = ph === 'countdown' || ph === 'running';
+    var curIdx = ph === 'running' ? diag.idx : (ph === 'countdown' || ph === 'starting' ? -1 : n);
+    var segs = $('dSegs').children;
+    for (var i = 0; i < segs.length; i++) segs[i].className = 'dseg' + (i < curIdx ? ' done' : (i === curIdx ? ' cur' : ''));
+
+    $('dTimer').hidden = !stepPhase;
+    $('dNav').hidden = ph !== 'running';
+    $('dDump').hidden = !(ph === 'dumping' || ph === 'stopping' || ph === 'starting');
+
+    var cnt = $('dCount');
+    if (ph === 'starting') {
+      $('dStepNo').textContent = 'Starting';
+      $('dLabel').textContent = 'Starting the recording';
+      $('dText').textContent = 'Waiting for the bridge...';
+      $('dDumpText').textContent = 'Waiting for the bridge to start recording...';
+      $('dBar').style.width = '0%';
+      $('dDumpSub').textContent = '';
+    } else if (ph === 'countdown') {
+      var left = Math.max(0, diag.cdEnd - Date.now());
+      $('dStepNo').textContent = 'Get ready';
+      $('dLabel').textContent = 'Step 1: ' + diag.steps[0].label;
+      $('dText').textContent = diag.steps[0].text;
+      cnt.textContent = String(Math.max(1, Math.ceil(left / 1000)));
+      cnt.className = 'countdown ready';
+      $('dCountSub').textContent = 'get ready';
+    } else if (ph === 'running') {
+      var st = diag.steps[diag.idx];
+      $('dStepNo').textContent = 'Step ' + (diag.idx + 1) + ' of ' + n;
+      if ($('dLabel').textContent !== st.label) {
+        $('dLabel').textContent = st.label;
+        $('dText').textContent = st.text;
+      }
+      cnt.textContent = String(Math.max(0, Math.ceil((diag.endAt - Date.now()) / 1000)));
+      cnt.className = 'countdown';
+      $('dCountSub').textContent = 'seconds';
+      $('dBack').disabled = diag.sent >= MAX_MARKERS;
+      $('dNext').textContent = diag.idx === n - 1 ? 'FINISH' : 'NEXT';
+    } else if (ph === 'stopping' || ph === 'dumping') {
+      var d = diag.dump;
+      $('dStepNo').textContent = 'Finishing';
+      $('dLabel').textContent = 'Recording done';
+      $('dText').textContent = 'You can relax. Keep the phone near the bike while the recording downloads.';
+      if (ph === 'stopping' || !d || !d.begun) {
+        $('dDumpText').textContent = ph === 'stopping' ? 'Stopping the recording...' : 'Requesting the recording...';
+        $('dBar').style.width = '0%';
+        $('dDumpSub').textContent = '';
+      } else {
+        var got = d.x.length, pct = d.count ? Math.min(100, got / d.count * 100) : 0;
+        $('dDumpText').textContent = 'Downloading recording... ' + Math.floor(pct) + '%';
+        $('dBar').style.width = pct.toFixed(1) + '%';
+        $('dDumpSub').textContent = got + ' of ' + d.count + ' samples' + (d.bad ? ' · ' + d.bad + ' bad lines' : '');
+      }
+    }
+
+    // recording info from the S line's rec field
+    var s = state.s, info = '';
+    var per = diag.period || 40;
+    var recN = s && fin(s.rec) ? s.rec : NaN;
+    if (ph === 'countdown' || ph === 'running') {
+      if (fin(recN)) {
+        info = 'REC ' + mmss(recN * per) + ' · ' + recN + ' samples · ' + mmss(Math.max(0, diag.capacity - recN) * per) + ' left';
+      } else if (diag.startedAt) {
+        var el = Date.now() - diag.startedAt;
+        info = 'REC ' + mmss(el) + ' · ' + mmss(Math.max(0, diag.capacity * per - el)) + ' left';
+      }
+    }
+    $('dRec').textContent = info;
+  }
+
+  function transferActive() {
+    return diag.phase === 'dumping' || !!(state.s && state.s.flags.Y);
   }
 
   // ===================================================================
@@ -796,6 +1754,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
         state.s = null;
         keepAwake(false);
         logLine(msg || 'Disconnected.', 'sys');
+        diagOnDisconnect();
+        if (state.q) { clearTimeout(state.q.timer); state.q = null; }
         break;
       case 'unsupported':
         txt.textContent = 'Bluetooth unavailable';
@@ -808,6 +1768,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
         break;
     }
     render();
+    renderDiag();
   }
 
   // ===================================================================
@@ -835,7 +1796,12 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   // ===================================================================
   // Rendering
   // ===================================================================
-  function isStale() { return !state.s || (Date.now() - state.sAt) > STALE_MS; }
+  // Status lines pause while a recording is being sent, so that is not "stale".
+  function isStale() {
+    if (!state.s) return true;
+    if (transferActive()) return false;
+    return (Date.now() - state.sAt) > STALE_MS;
+  }
 
   function setChip(id, on, cls) {
     var el = $(id);
@@ -858,6 +1824,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     setChip('chipV', !!f.V);
     $('chipS').hidden = !f.S;
     $('chipH').hidden = !f.H;
+    $('chipG').hidden = !f.G;
+    $('chipY').hidden = !(f.Y || diag.phase === 'dumping');
     $('chipHText').textContent = 'Hold, off ' + fmt(s ? s.off : NaN, 1) + ' µT';
 
     gearEl.className = 'gear';
@@ -877,6 +1845,12 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     $('res').textContent = fmt(s.res, 0);
 
     var calibrated = s.gear > 0 && !!s.flags.V;
+    if (transferActive()) {
+      gearEl.textContent = calibrated ? String(s.gear) : '--';
+      gearEl.classList.add('dim');
+      note.textContent = 'Sending diagnostics recording...';
+      return;
+    }
     if (stale) {
       gearEl.textContent = calibrated ? String(s.gear) : '--';
       gearEl.classList.add('dim');
@@ -979,6 +1953,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     var b = $('calBadge');
     var calActive = state.s && state.s.cal !== 0;
     b.hidden = state.view === 'cal' || !(calActive || (state.result && state.result.type));
+    var ph = diag.phase;
+    $('diagBadge').hidden = state.view === 'diag' || ph === 'idle' || ph === 'done' || ph === 'error';
   }
 
   function pointLabel(n) {
@@ -1032,6 +2008,12 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
           (fin(r.minAt) ? r.minAt : '?') + ') is under ' + MARGINAL_UT + ' µT. That gear may flicker. Consider moving the sensor closer to the magnet and recalibrating.</div>';
       }
       if (!r.ok) html += '<p class="small">Tap Start calibration to try again.</p>';
+      if (r.recordId) {
+        var rec = findRecord(r.recordId);
+        html += rec
+          ? '<p class="small" style="margin-top:12px">' + (rec.persisted ? 'Saved on this phone as ' : 'Kept for this session only as ') + esc(rec.filename) + '.</p>' + recActionsHtml(rec.id)
+          : '<p class="small" style="margin-top:12px">Deleted from this phone.</p>';
+      }
     } else {
       card.className = 'card result bad';
       html = '<h2>Calibration aborted' + close + '</h2><p><b>' + esc(r.reason) + '</b></p>' +
@@ -1088,9 +2070,9 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   // Tabs
   // ===================================================================
   function showView(v) {
-    if (['ride', 'cal', 'console'].indexOf(v) < 0) v = 'ride';
+    if (['ride', 'cal', 'diag', 'console'].indexOf(v) < 0) v = 'ride';
     state.view = v;
-    var views = { ride: 'view-ride', cal: 'view-cal', console: 'view-console' };
+    var views = { ride: 'view-ride', cal: 'view-cal', diag: 'view-diag', console: 'view-console' };
     Object.keys(views).forEach(function (k) { $(views[k]).classList.toggle('active', k === v); });
     Array.prototype.forEach.call(document.querySelectorAll('nav button'), function (b) {
       b.setAttribute('aria-selected', b.getAttribute('data-view') === v ? 'true' : 'false');
@@ -1147,6 +2129,34 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     if (t && t.closest && t.closest('[data-dismiss]')) { state.result = null; renderResult(); renderBadge(); }
   });
 
+  // Saved-record actions anywhere on the page (saved list, result cards).
+  document.addEventListener('click', function (ev) {
+    var b = ev.target && ev.target.closest ? ev.target.closest('[data-rec-act]') : null;
+    if (b) doRecAction(b.getAttribute('data-rec-act'), b.getAttribute('data-id'), b);
+  });
+
+  $('saveStored').addEventListener('click', requestStoredCal);
+  $('goSaved').addEventListener('click', function () {
+    showView('diag');
+    try { $('savedCard').scrollIntoView({ block: 'start' }); } catch (e) {}
+  });
+
+  // Diagnose
+  $('leanToggle').addEventListener('click', function () { diag.lean = !diag.lean; renderDiagIdleList(); });
+  $('diagStart').addEventListener('click', diagStart);
+  $('dNext').addEventListener('click', function () { if (diag.phase === 'running') nextStep(); });
+  $('dBack').addEventListener('click', function () { if (diag.phase === 'running') goStep(Math.max(0, diag.idx - 1)); });
+  $('dCancel').addEventListener('click', function () { twoTap($('dCancel'), 'TAP AGAIN TO CANCEL', diagCancel); });
+  $('diagResult').addEventListener('click', function (ev) {
+    var b = ev.target && ev.target.closest ? ev.target.closest('[data-diag]') : null;
+    if (!b) return;
+    var a = b.getAttribute('data-diag');
+    if (a === 'retry') requestDump();
+    else if (a === 'discard') twoTap(b, 'Tap again', function () { diag.dump = null; setDiagPhase('idle'); });
+    else if (a === 'dismiss') setDiagPhase('idle');
+  });
+  $('copyClose').addEventListener('click', function () { $('copySheet').hidden = true; $('copyText').value = ''; });
+
   $('rawToggle').addEventListener('click', function () {
     state.showRaw = !state.showRaw;
     $('rawToggle').setAttribute('aria-checked', state.showRaw ? 'true' : 'false');
@@ -1191,14 +2201,113 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       return pts;
     })();
 
+    // One FIFO of <=20-byte notification chunks, like the real TX characteristic.
+    // Items may also be functions (run in order, e.g. "transfer finished").
+    var txq = [], txHead = 0, pumping = false;
+    function enqueueText(text) {
+      var b = encoder.encode(text);
+      for (var i = 0; i < b.length; i += 20) txq.push(b.subarray(i, i + 20));
+      schedule();
+    }
+    function enqueueFn(fn) { txq.push(fn); schedule(); }
+    function schedule() { if (!pumping) { pumping = true; setTimeout(pump, 0); } }
+    function pump() {
+      pumping = false;
+      var n = 0;
+      while (txHead < txq.length && n < 800) {
+        var it = txq[txHead++];
+        if (typeof it === 'function') it();
+        else if (connected) onBytes(it);
+        n++;
+      }
+      if (txHead >= txq.length) { txq = []; txHead = 0; } else schedule();
+    }
     function out(line) {
       if (!connected) return;
-      var b = encoder.encode(line + '\r\n');
-      var chunks = [];
-      for (var i = 0; i < b.length; i += 20) chunks.push(b.slice(i, i + 20));
-      setTimeout(function () { chunks.forEach(function (c) { if (connected) onBytes(c); }); }, 0);
+      enqueueText(line + '\r\n');
     }
     function jitter(a) { return (Math.random() * 2 - 1) * a; }
+
+    // ---- diagnostics recording (25 Hz, 0.1 uT ints) ----
+    var REC_CAP = 12000, REC_PERIOD = 40;
+    var recording = false, dumping = false, samples = [], markers = [], recTimer = 0;
+    var recLast = 0, recStart = 0, markerAt = 0, revsF = 0, crank = 0, crank6Base = 0, dumpsSent = 0;
+
+    function lerpPath(f) {           // f: 0 (lever down) .. 1 (lever up)
+      var x = Math.max(0, Math.min(1, f)) * (TOTAL_POINTS - 1);
+      var i = Math.min(TOTAL_POINTS - 2, Math.floor(x)), u = x - i;
+      var a = PATH[i], b = PATH[i + 1];
+      return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
+    }
+
+    function sampleTick() {
+      if (!recording) return;
+      var now = performance.now();
+      var dt = samples.length ? Math.min(255, Math.round(now - recLast)) : 0;
+      recLast = now;
+      var k = markers.length;
+      var el = (now - markerAt) / 1000 * FAST;  // seconds into the step, on the nominal timeline
+      var lever = 0, rpm = 0, lean = 0, crankDeg;
+      switch (k) {
+        case 0: case 1: case 5: lever = 0; break;
+        case 2: lever = el / 15; break;
+        case 3: lever = 1; break;
+        case 4: lever = 1 - el / 15; break;
+        case 6:   // one slow revolution by hand, pausing at each quarter
+          lever = 0;
+          crankDeg = crank6Base + (Math.floor(el / 5) + Math.min(1, (el % 5) / 2)) * 90;
+          if (crankDeg > crank6Base + 360) crankDeg = crank6Base + 360;
+          break;
+        case 7: lever = Math.min(0.46, el / 8 * 0.46); rpm = 70; break;
+        case 8: lever = 0.46; rpm = 60; break;
+        case 9: lever = 0.46; rpm = 95; break;
+        case 10: lever = 0.46; rpm = Math.max(0, 95 - el * 30); break;
+        default: lever = 0.46; lean = el < 5 ? 1 : el < 10 ? 0 : -1; break;
+      }
+      var prevCrank = crank;
+      if (crankDeg !== undefined) crank = crankDeg;
+      else crank += rpm / 60 * 360 * dt / 1000;
+      if (k !== 6) crank6Base = crank;
+      revsF += Math.max(0, crank - prevCrank) / 360;
+      var p = lerpPath(lever);
+      var th = crank * Math.PI / 180;
+      var fx = p[0] + 0.9 * Math.sin(th) + 1.6 * lean + jitter(0.35);
+      var fy = p[1] + 0.5 * Math.cos(th) + jitter(0.35);
+      var fz = p[2] + 0.4 * Math.sin(2 * th) - 0.8 * lean + jitter(0.35);
+      samples.push([Math.round(fx * 10), Math.round(fy * 10), Math.round(fz * 10), Math.floor(revsF) % 65536, dt]);
+      if (samples.length >= REC_CAP) stopRecording('full');
+    }
+
+    function recDuration() {
+      var s = 0;
+      for (var i = 0; i < samples.length; i++) s += samples[i][4];
+      return s;
+    }
+    function stopRecording(kind) {
+      if (!recording) return;
+      recording = false;
+      clearInterval(recTimer);
+      out('G,' + kind + ',' + samples.length + ',' + recDuration());
+    }
+
+    function sendRecording() {
+      if (recording) stopRecording('stop');
+      dumping = true;
+      var n = samples.length, sum = 0;
+      var lines = ['Y,begin,' + n + ',' + REC_PERIOD + ',' + markers.length];
+      markers.forEach(function (m, i) { lines.push('Y,m,' + (i + 1) + ',' + m); });
+      var dropAt = DEMO_DROP && dumpsSent === 0 && n > 10 ? Math.floor(n / 2) : -1;
+      for (var i = 0; i < n; i++) {
+        var s = samples[i];
+        sum += s[0] + s[1] + s[2];
+        if (i === dropAt) continue;   // simulate a lost notification
+        lines.push('D,' + s[0] + ',' + s[1] + ',' + s[2] + ',' + s[3] + ',' + s[4]);
+      }
+      lines.push('Y,end,' + n + ',' + (((sum % 65536) + 65536) % 65536));
+      dumpsSent++;
+      enqueueText(lines.join('\r\n') + '\r\n');
+      enqueueFn(function () { dumping = false; });
+    }
     function gearToRes(g) { return Math.min(100, 2.5 + (g - 1) * 4.25); }
 
     function tick() {
@@ -1242,10 +2351,12 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       if (sat) flags += 'S';
       if (hold && calValid) flags += 'H';
       if (auto) flags += 'A';
+      if (recording) flags += 'G';
+      if (dumping) flags += 'Y';
 
-      if (stream) {
+      if (stream && !dumping) {   // status lines pause during a transfer
         out(['S', calValid ? gear : 0, res.toFixed(1), Math.max(0, watts), cad.toFixed(1),
-          cal, cal ? step : 0, Math.round(stab), off.toFixed(1), flags].join(','));
+          cal, cal ? step : 0, Math.round(stab), off.toFixed(1), flags, samples.length].join(','));
       }
       if (debug && t % 4 === 0) {
         var p = PATH[Math.max(0, Math.min(24, gear - 1))];
@@ -1272,6 +2383,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
 
     this.receive = function (c) {
       if (!connected) return;
+      if (DEMO_OLDFW && 'kgmey'.indexOf(c) >= 0) { out("Unknown command '" + c + "'. h = help."); return; }
       switch (c) {
         case '1': stream = true; break;
         case '0': stream = false; out('Status stream off.'); break;
@@ -1309,10 +2421,42 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
           });
           out('  span = 146.0 µT, smallest step = 3.8 µT at gear 6');
           break;
+        case 'k':
+          if (!calValid) { out('Q,none'); break; }
+          PATH.forEach(function (p, i) {
+            out('Q,' + (i + 1) + ',' + p[0].toFixed(1) + ',' + p[1].toFixed(1) + ',' + p[2].toFixed(1));
+          });
+          out('Q,end,146.0,3.8,6');
+          break;
+        case 'g':
+          if (dumping) { out('Busy sending the recording.'); break; }
+          clearInterval(recTimer);
+          samples = []; markers = []; recording = true;
+          recStart = recLast = markerAt = performance.now();
+          revsF = 1234; crank = 0; crank6Base = 0;
+          recTimer = setInterval(sampleTick, REC_PERIOD);
+          out('G,start,' + REC_CAP + ',' + REC_PERIOD);
+          break;
+        case 'm':
+          if (!recording || markers.length >= 32) break;
+          markers.push(samples.length);
+          markerAt = performance.now();
+          out('M,' + markers.length + ',' + samples.length);
+          break;
+        case 'e':
+          if (!recording) { out('Not recording.'); break; }
+          stopRecording('stop');
+          break;
+        case 'y':
+          if (dumping) break;
+          sendRecording();
+          break;
         case 'h': case '?':
           out('Commands: 1/0=status stream on/off  c=calibrate  n=capture point');
           out('          u=undo point  x=abort  a=auto-capture on/off');
-          out('          d=debug stream on/off  p=show calibration  h=help');
+          out('          p=show calibration  k=calibration as Q lines');
+          out('          g=start recording  m=marker  e=stop  y=send recording');
+          out('          d=debug stream on/off  h=help');
           break;
         case 'd': debug = !debug; out('Debug stream ' + (debug ? 'ON' : 'OFF') + '.'); break;
         default: out("Unknown command '" + c + "'. h = help.");
@@ -1330,6 +2474,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     this.disconnect = function () {
       connected = false; stream = false; debug = false;
       clearInterval(timer);
+      txq = []; txHead = 0;
+      dumping = false;            // a transfer in flight is lost; the recording itself is kept
     };
   }
 
@@ -1351,12 +2497,15 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   // ===================================================================
   var startView = 'ride';
   try { startView = localStorage.getItem('m3bridge.view') || 'ride'; } catch (e) {}
+  loadRecords();
   showView(startView);
   renderPoints();
   renderResult();
+  renderSaved();
+  renderDiag();
   if (DEMO) {
     setConn('idle');
-    logLine('Demo mode: no Bluetooth. Add &uncal=1 to the URL to start uncalibrated.', 'sys');
+    logLine('Demo mode: no Bluetooth. URL options: &uncal=1 start uncalibrated, &fast=1 short diagnostic steps, &drop=1 lose one line in the first recording transfer.', 'sys');
   } else if (!navigator.bluetooth) {
     setConn('unsupported');
   } else {
@@ -1364,7 +2513,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   }
 
   // Expose a tiny hook for debugging in a desktop console.
-  window.M3Bridge = { state: state, handleLine: handleLine, send: send };
+  window.M3Bridge = { state: state, diag: diag, handleLine: handleLine, send: send, renderSaved: renderSaved, addRecord: addRecord, onBytes: onBytes };
 })();
 </script>
 </body>
