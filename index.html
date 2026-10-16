@@ -320,7 +320,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
 .recinfo { font-family: var(--mono); font-size: .85rem; color: var(--muted); min-height: 1.2em; }
 #diagRun, #diagIdle { display: flex; flex-direction: column; gap: 12px; }
 .bar { height: 18px; border-radius: 9px; background: var(--surface2); border: 1px solid var(--line); overflow: hidden; }
-.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s linear; }
+.bar > i { display: block; height: 100%; width: 100%; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform .15s linear; }
 .dump-text { font-size: 1.1rem; font-weight: 700; margin: 10px 0 6px; }
 .btn.secondary { background: var(--surface); }
 .linkbtn { background: none; border: 0; color: var(--accent); font-weight: 700; min-height: 48px; padding: 0 4px; text-decoration: underline; }
@@ -1538,7 +1538,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       $('dLabel').textContent = 'Starting the recording';
       $('dText').textContent = 'Waiting for the bridge...';
       $('dDumpText').textContent = 'Waiting for the bridge to start recording...';
-      $('dBar').style.width = '0%';
+      $('dBar').style.transform = 'scaleX(0)';
       $('dDumpSub').textContent = '';
     } else if (ph === 'countdown') {
       var left = Math.max(0, diag.cdEnd - Date.now());
@@ -1567,12 +1567,12 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       $('dText').textContent = 'You can relax. Keep the phone near the bike while the recording downloads.';
       if (ph === 'stopping' || !d || !d.begun) {
         $('dDumpText').textContent = ph === 'stopping' ? 'Stopping the recording...' : 'Requesting the recording...';
-        $('dBar').style.width = '0%';
+        $('dBar').style.transform = 'scaleX(0)';
         $('dDumpSub').textContent = '';
       } else {
         var got = d.x.length, pct = d.count ? Math.min(100, got / d.count * 100) : 0;
         $('dDumpText').textContent = 'Downloading recording... ' + Math.floor(pct) + '%';
-        $('dBar').style.width = pct.toFixed(1) + '%';
+        $('dBar').style.transform = 'scaleX(' + (pct / 100).toFixed(3) + ')';
         $('dDumpSub').textContent = got + ' of ' + d.count + ' samples' + (d.bad ? ' · ' + d.bad + ' bad lines' : '');
       }
     }
