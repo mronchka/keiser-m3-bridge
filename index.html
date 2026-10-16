@@ -432,6 +432,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
         </div>
         <button class="btn primary big" id="calStart" type="button" style="margin-top:12px">Start calibration</button>
         <button class="btn secondary" id="saveStored" type="button" style="margin-top:10px; width:100%">Save stored calibration</button>
+        <p class="small" id="storedMsg" role="status" hidden style="color:var(--warn);font-weight:600;margin:8px 0 0"></p>
         <p class="small muted" style="margin:8px 0 0">Every finished calibration is saved on this phone automatically. <button class="linkbtn" type="button" id="goSaved">See saved runs</button></p>
       </div>
     </div>
@@ -442,6 +443,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
         <div class="cal-count" id="calCount">0 captured</div>
       </div>
       <div class="segs" id="segs" aria-hidden="true"></div>
+      <div class="small" id="calWait" role="status" hidden style="color:var(--warn);font-weight:600">Waiting for the bridge…</div>
       <div class="prompt" id="calPrompt" aria-live="polite"></div>
       <div class="meter">
         <div class="ring" id="ring">
@@ -577,7 +579,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   var NAME_PREFIX = 'Keiser M3 Bridge';
   var TOTAL_POINTS = 25;
   var MARGINAL_UT = 1.5;
-  var STALE_MS = 2000;
+  var STALE_MS = 5000;      // Bluetooth text can stall for over a second on the real board
+  var WAIT_NOTE_MS = 2500;  // calibration: show the small 'Waiting for the bridge' note after this much silence
   var LOG_MAX = 600;
   var RX_BUF_MAX = 2048;
 
@@ -588,7 +591,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   var DEMO_DROP = params.get('drop') === '1';       // demo: drop one D line in the first transfer
   var DEMO_OLDFW = params.get('oldfw') === '1';     // demo: act like firmware without k/g/m/e/y
   var FAST = params.get('fast') === '1' ? 5 : 1;    // divide diagnostic step times by 5
-  var DEMO_V3 = params.get('v3') === '1';           // demo: simulate firmware v3 (calibration while pedalling)
+  var DEMO_V3 = params.get('v3') === '1';
+  var DEMO_STALL = params.get('stall') === '1';     // demo: status lines stall for 3 s every ~12 s           // demo: simulate firmware v3 (calibration while pedalling)
 
   var DIAG_STEPS = [
     { label: 'Hands off — lever down', text: "Push the lever all the way down. Don't touch the bike.", secs: 8 },
@@ -609,6 +613,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   var CAL3_PROMPT = 'Pedal steadily for about 10 seconds so the bridge can learn your crank';
 
   function $(id) { return document.getElementById(id); }
+  // Only touch the DOM when visibility really changes (no needless re-layout on every status line).
+  function setHidden(id, v) { var el = $(id); v = !!v; if (el.hidden !== v) el.hidden = v; }
 
   // ===================================================================
   // App state
@@ -784,8 +790,16 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     var prevCal = state.s ? state.s.cal : 0;
     state.s = s;
     state.sAt = Date.now();
-    state.v3 = !!src;
-    if (prevCal === 0 && cal !== 0) onCalStarted();
+    if (src) state.v3 = true;   // latched until disconnect
+    if (prevCal === 0 && cal !== 0) {
+      // A fresh calibration starts at step 0. A later step after a reconnect is the same run continuing.
+      if (s.step > 0 && state.points.length) state.calEnded = false;
+      else onCalStarted();
+    }
+    if (prevCal !== 0 && cal === 0) {
+      // Ended: K or A normally arrives just before this. If neither does, keep what was captured.
+      setTimeout(function () { if (!state.calEnded) savePartialCal('ended without a result'); }, 1500);
+    }
     if (prevCal === 3 && (cal === 1 || cal === 2)) {
       toast('Crank learned. Start the 25 points.');
       try { if (navigator.vibrate) navigator.vibrate([60, 60, 60]); } catch (e) {}
@@ -819,6 +833,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       msg: p.slice(5).join(',').trim()
     };
     state.result = r;
+    state.calEnded = true;
     logLine(r.ok
       ? 'Calibration saved: span ' + fmt(r.span, 1) + ' µT, smallest step ' + fmt(r.minstep, 1) + ' µT at gear ' + (fin(r.minAt) ? r.minAt : '?')
       : 'Calibration rejected: ' + (r.msg || 'no reason given'), 'sys');
@@ -836,6 +851,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     var reason = p.slice(1).join(',').trim();
     state.result = { type: 'A', reason: reason || 'no reason given' };
     logLine('Calibration aborted: ' + state.result.reason, 'sys');
+    state.result.recordId = savePartialCal('aborted: ' + state.result.reason);
     renderResult();
     renderBadge();
     return true;
@@ -857,8 +873,25 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   function onCalStarted() {
     state.points = [];
     state.result = null;
+    state.calEnded = false;
+    state.partialSaved = -1;
+    setHidden('storedMsg', true);
     renderPoints();
     renderResult();
+  }
+
+  // Save the points of a calibration that ended without a K line (abort, disconnect,
+  // or no result). Saved at most once per point count, and only with at least 1 point.
+  function savePartialCal(reason) {
+    state.calEnded = true;
+    var n = state.points.length;
+    if (!n || state.partialSaved === n) return null;
+    state.partialSaved = n;
+    try {
+      var id = saveCalRecord('run', { ok: false, partial: true, msg: reason }, state.points);
+      logLine('Saved the ' + n + ' captured point' + (n > 1 ? 's' : '') + ' as an incomplete calibration.', 'sys');
+      return id;
+    } catch (e) { console.warn('partial save failed', e); return null; }
   }
 
   // ===================================================================
@@ -868,6 +901,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   function requestStoredCal() {
     if (state.conn !== 'connected') { toast('Not connected'); return; }
     if (state.q) clearTimeout(state.q.timer);
+    setHidden('storedMsg', true);
     state.q = { points: [], timer: 0 };
     state.q.timer = setTimeout(function () {
       if (state.q) { state.q = null; toast('No reply. The bridge may need firmware v2.'); }
@@ -880,7 +914,12 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     if (kind === 'none') {
       if (state.q) clearTimeout(state.q.timer);
       state.q = null;
-      toast('No calibration stored');
+      var hasPartial = records.some(function (x) { return x.type === 'cal' && x.partial; });
+      var m = $('storedMsg');
+      m.textContent = 'No complete calibration on the bridge yet. Finish all 25 points first' +
+        (hasPartial ? ' — your captured points from the last attempt are under Saved runs.' : '.');
+      m.hidden = false;
+      toast('No complete calibration on the bridge');
       return true;
     }
     if (kind === 'end') {
@@ -1340,15 +1379,15 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     var d = new Date();
     var pts = pointsIn.slice().sort(function (a, b) { return a.point - b.point; });
     var stored = source === 'stored';
-    var result = stored ? 'stored' : (info.ok ? 'saved' : 'rejected');
+    var result = stored ? 'stored' : info.partial ? 'incomplete (' + pts.length + ' of ' + TOTAL_POINTS + ' points)' : (info.ok ? 'saved' : 'rejected');
     var lines = [
       '# Keiser M3 Bridge calibration',
       '# record: calibration',
       '# source: ' + (stored ? 'stored (read back from the bridge with k)' : 'calibration run'),
       '# timestamp: ' + d.toISOString(),
       '# result: ' + result,
-      '# span_uT: ' + fmt(info.span, 1),
-      '# minstep_uT: ' + fmt(info.minstep, 1),
+      '# span_uT: ' + (fin(info.span) ? info.span.toFixed(1) : ''),
+      '# minstep_uT: ' + (fin(info.minstep) ? info.minstep.toFixed(1) : ''),
       '# minstep_at_gear: ' + (fin(info.minAt) ? info.minAt : ''),
       '# message: ' + ascii(info.msg || ''),
       '# points: ' + pts.length + ' of ' + TOTAL_POINTS,
@@ -1364,12 +1403,14 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       lines.push([p.point, pointLabel(p.point), fmt(p.x, 1), fmt(p.y, 1), fmt(p.z, 1), fin(dd) ? dd.toFixed(2) : '']
         .map(function (v) { return csvCell(v === '--' ? '' : v); }).join(','));
     }
-    var title = stored ? 'Stored calibration' : (info.ok ? 'Calibration saved' : 'Calibration rejected');
-    var summary = 'Span ' + fmt(info.span, 1) + ' µT · smallest step ' + fmt(info.minstep, 1) + ' µT' +
+    var title = stored ? 'Stored calibration' : info.partial ? 'Calibration incomplete' : (info.ok ? 'Calibration saved' : 'Calibration rejected');
+    var summary = info.partial
+      ? 'incomplete (' + pts.length + ' of ' + TOTAL_POINTS + ' points) · ' + info.msg
+      : 'Span ' + fmt(info.span, 1) + ' µT · smallest step ' + fmt(info.minstep, 1) + ' µT' +
       (fin(info.minAt) ? ' at gear ' + info.minAt : '') + ' · ' + pts.length + ' points' +
       (!stored && !info.ok && info.msg ? ' · ' + info.msg : '');
     return addRecord({
-      id: newId(d), type: 'cal', source: source, ts: d.toISOString(), title: title, summary: summary,
+      id: newId(d), type: 'cal', source: source, partial: !!info.partial, ts: d.toISOString(), title: title, summary: summary,
       filename: 'keiser-cal-' + fileStamp(d) + '.csv'
     }, lines.join('\n') + '\n');
   }
@@ -1476,7 +1517,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     $('copyTitle').textContent = title;
     var ta = $('copyText');
     ta.value = text;
-    $('copySheet').hidden = false;
+    setHidden('copySheet', false);
     try { ta.focus(); ta.select(); ta.setSelectionRange(0, text.length); } catch (e) {}
   }
 
@@ -1544,9 +1585,9 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   function renderDiag() {
     var ph = diag.phase, connected = state.conn === 'connected';
     var runVisible = ph === 'starting' || ph === 'countdown' || ph === 'running' || ph === 'stopping' || ph === 'dumping';
-    $('diagRun').hidden = !runVisible;
-    $('diagIdle').hidden = runVisible || ph === 'incomplete' || ph === 'interrupted';
-    $('savedCard').hidden = runVisible;
+    setHidden('diagRun', !runVisible);
+    setHidden('diagIdle', runVisible || ph === 'incomplete' || ph === 'interrupted');
+    setHidden('savedCard', runVisible);
     $('diagStart').disabled = !connected;
     $('diagStart').textContent = connected ? 'Start diagnostic run' : 'Connect first';
     renderDiagIdleList();
@@ -1603,9 +1644,9 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     var segs = $('dSegs').children;
     for (var i = 0; i < segs.length; i++) segs[i].className = 'dseg' + (i < curIdx ? ' done' : (i === curIdx ? ' cur' : ''));
 
-    $('dTimer').hidden = !stepPhase;
-    $('dNav').hidden = ph !== 'running';
-    $('dDump').hidden = !(ph === 'dumping' || ph === 'stopping' || ph === 'starting');
+    setHidden('dTimer', !stepPhase);
+    setHidden('dNav', ph !== 'running');
+    setHidden('dDump', !(ph === 'dumping' || ph === 'stopping' || ph === 'starting'));
 
     var cnt = $('dCount');
     if (ph === 'starting') {
@@ -1796,7 +1837,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     hb.hidden = true;
     btn.disabled = false;
     cm.className = isErr ? 'err' : 'muted';
-    $('demoHint').hidden = true;
+    setHidden('demoHint', true);
     var label = DEMO ? ' (demo)' : '';
     switch (c) {
       case 'idle':
@@ -1827,7 +1868,12 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
         card.classList.add('show');
         btn.textContent = 'Reconnect';
         cm.textContent = msg || 'Disconnected.';
+        // A calibration in progress: keep its points as an incomplete record (once).
+        if (state.s && state.s.cal !== 0) savePartialCal('connection lost');
         state.s = null;
+        state.v3 = false;          // re-detected from the next S lines
+        state.lastTurn = null;
+        renderTurnInfo();
         keepAwake(false);
         logLine(msg || 'Disconnected.', 'sys');
         diagOnDisconnect();
@@ -1840,7 +1886,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
         btn.disabled = true;
         cm.className = 'err';
         cm.textContent = 'This browser has no Web Bluetooth. Open this page in Bluefy on iPhone, or Chrome on Android/desktop.';
-        $('demoHint').hidden = false;
+        setHidden('demoHint', false);
         break;
     }
     render();
@@ -1894,20 +1940,20 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   function renderRide() {
     var s = state.s, stale = isStale(), connected = state.conn === 'connected';
     var gearEl = $('gear'), note = $('gearNote'), goCal = $('goCal');
-    var f = (s && !stale) ? s.flags : {};
+    // Late S lines never change what is shown: the last values stay, with a small note.
+    var f = s ? s.flags : {};
     setChip('chipP', !!f.P);
     setChip('chipZ', !!f.Z);
     setChip('chipV', !!f.V);
-    $('chipS').hidden = !f.S;
-    $('chipH').hidden = !f.H;
-    $('chipG').hidden = !f.G;
-    $('chipY').hidden = !(f.Y || diag.phase === 'dumping');
+    setHidden('chipS', !f.S);
+    setHidden('chipH', !f.H);
+    setHidden('chipG', !f.G);
+    setHidden('chipY', !(f.Y || diag.phase === 'dumping'));
     $('chipHText').textContent = 'Hold, off ' + fmt(s ? s.off : NaN, 1) + ' µT';
 
     gearEl.className = 'gear';
     note.className = 'gear-note';
-    goCal.hidden = true;
-    $('tiles').classList.toggle('stale', stale);
+    setHidden('goCal', !(s && !(s.gear > 0 && s.flags.V) && !transferActive()));
 
     if (!s) {
       gearEl.textContent = '--';
@@ -1921,7 +1967,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     $('res').textContent = fmt(s.res, 0);
     // [v3] cadence source under the cadence
     var cs = $('cadSrc');
-    cs.hidden = !s.src;
+    setHidden('cadSrc', !s.src);
     cs.className = 'src' + (s.src && !s.pedalling ? ' off' : '');
     cs.textContent = !s.src ? '' : !s.pedalling ? 'not pedalling' : s.src === 'B' ? 'from crank magnet' : 'from Wahoo pod';
 
@@ -1932,19 +1978,12 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       note.textContent = 'Sending diagnostics recording...';
       return;
     }
-    if (stale) {
-      gearEl.textContent = calibrated ? String(s.gear) : '--';
-      gearEl.classList.add('dim');
-      note.textContent = 'No status data. Is the stream off?';
-      note.classList.add('warn');
-      return;
-    }
     if (!calibrated) {
       gearEl.textContent = '--';
       gearEl.classList.add('dim');
       note.textContent = s.cal !== 0 ? 'Calibration in progress' : 'Not calibrated — go to Calibrate';
       note.classList.add('warn');
-      goCal.hidden = false;
+      if (stale) note.textContent = 'Waiting for the bridge…';
       return;
     }
     gearEl.textContent = String(s.gear);
@@ -1964,6 +2003,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     } else {
       note.textContent = '';
     }
+    if (stale) { note.className = 'gear-note warn'; note.textContent = 'Waiting for the bridge…'; }
   }
 
   function promptHtml(step, v3) {
@@ -1982,14 +2022,16 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
 
   function renderCal() {
     var s = state.s, connected = state.conn === 'connected';
-    var active = !!(s && s.cal !== 0 && !isStale());
-    $('calIdle').hidden = active;
-    $('calActive').hidden = !active;
+    // Staleness never switches the view: an active calibration stays on screen with the last values.
+    var active = !!(s && s.cal !== 0);
+    setHidden('calWait', !(active && !transferActive() && Date.now() - state.sAt > WAIT_NOTE_MS));
+    setHidden('calIdle', active);
+    setHidden('calActive', !active);
     $('calStart').disabled = !connected || !s;
     $('calStart').textContent = connected ? 'Start calibration' : 'Connect first';
-    var v3 = !!(s && s.src);
-    $('calIntroV2').hidden = v3;
-    $('calIntroV3').hidden = !v3;
+    var v3 = state.v3;   // latched per connection
+    setHidden('calIntroV2', v3);
+    setHidden('calIntroV3', !v3);
 
     // auto-capture toggle reflects the A flag
     var at = $('autoToggle');
@@ -2002,7 +2044,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     }
     at.disabled = !connected;
 
-    $('pointsCard').hidden = state.points.length === 0 && !active;
+    setHidden('pointsCard', state.points.length === 0 && !active);
 
     if (!active) { lastStepRendered = -1; return; }
 
@@ -2067,7 +2109,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     var calActive = state.s && state.s.cal !== 0;
     b.hidden = state.view === 'cal' || !(calActive || (state.result && state.result.type));
     var ph = diag.phase;
-    $('diagBadge').hidden = state.view === 'diag' || ph === 'idle' || ph === 'done' || ph === 'error';
+    setHidden('diagBadge', state.view === 'diag' || ph === 'idle' || ph === 'done' || ph === 'error');
   }
 
   function pointLabel(n) {
@@ -2131,6 +2173,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       card.className = 'card result bad';
       html = '<h2>Calibration aborted' + close + '</h2><p><b>' + esc(r.reason) + '</b></p>' +
         '<p class="small">The previous calibration (if any) is unchanged.</p>';
+      var prec = r.recordId ? findRecord(r.recordId) : null;
+      if (prec) html += '<p class="small">The points captured so far were saved as ' + esc(prec.filename) + ' (' + esc(prec.summary) + ').</p>' + recActionsHtml(prec.id);
     }
     card.innerHTML = html;
   }
@@ -2268,7 +2312,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     else if (a === 'discard') twoTap(b, 'Tap again', function () { diag.dump = null; setDiagPhase('idle'); });
     else if (a === 'dismiss') setDiagPhase('idle');
   });
-  $('copyClose').addEventListener('click', function () { $('copySheet').hidden = true; $('copyText').value = ''; });
+  $('copyClose').addEventListener('click', function () { setHidden('copySheet', true); $('copyText').value = ''; });
 
   $('rawToggle').addEventListener('click', function () {
     state.showRaw = !state.showRaw;
@@ -2301,6 +2345,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     var t = 0, gear = 7, cad = 0, timer = 0;
     // [v3] turn detection from the crank magnet
     var turnAcc = 0, turnMs = 0, agree = 0, tStream = false, pedal = true;
+    var pauseUntil = 0;   // status lines held back until this time (simulated Bluetooth stall)
+    this.pauseStatus = function (ms) { pauseUntil = Date.now() + ms; };
 
     // A plausible calibration path: 25 points, total ~146 µT, smallest step 3.8 µT at gear 6.
     var PATH = (function () {
@@ -2506,7 +2552,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       if (recording) flags += 'G';
       if (dumping) flags += 'Y';
 
-      if (stream && !dumping) {   // status lines pause during a transfer
+      if (DEMO_STALL && t % 48 === 0) pauseUntil = Date.now() + 3000;
+      if (stream && !dumping && Date.now() >= pauseUntil) {   // status lines pause during a transfer or a stall
         out(['S', calValid ? gear : 0, res.toFixed(1), Math.max(0, watts), cad.toFixed(1),
           cal, cal ? step : 0, Math.round(stab), off.toFixed(1), flags, samples.length]
           .concat(DEMO_V3 ? [pedal ? 'B' : '-'] : []).join(','));
@@ -2693,7 +2740,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   }
 
   // Expose a tiny hook for debugging in a desktop console.
-  window.M3Bridge = { state: state, diag: diag, handleLine: handleLine, send: send, renderSaved: renderSaved, addRecord: addRecord, onBytes: onBytes };
+  window.M3Bridge = { state: state, diag: diag, handleLine: handleLine, send: send, renderSaved: renderSaved, addRecord: addRecord, onBytes: onBytes, sim: function () { return sim; } };
 })();
 </script>
 </body>

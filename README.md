@@ -38,11 +38,13 @@ Web Bluetooth only works on secure pages: `https://`, or `http://localhost` on a
    - The meter shows "Turns agreeing: n of 3". With auto-capture on, the point is taken at 3 of 3.
    - On the Ride tab the cadence shows where it comes from (crank magnet or Wahoo pod). When you stop pedalling it says "Not pedalling" and dims the gear, because the gear only updates on whole turns. Watts at 0 is normal then.
 
-   Every finished calibration (saved or rejected) is saved on the phone automatically. **Save stored calibration** reads the calibration currently stored on the bridge and saves it the same way.
+   Every finished calibration (saved or rejected) is saved on the phone automatically. A calibration that ends early (cancelled, aborted, or the connection drops) is also saved, with the points captured so far, as "Calibration incomplete (N of 25 points)". If the connection drops and you reconnect while the bridge is still calibrating, the page carries on with the same run. **Save stored calibration** reads the calibration currently stored on the bridge and saves it the same way; if the bridge has no complete calibration yet, the page says so.
+
+   Bluetooth text from the bridge can arrive in bursts. The page keeps showing the last values when status lines are late; during calibration a small "Waiting for the bridge..." note appears after about 2.5 s of silence, and on the Ride tab after 5 s.
 4. **Diagnose** tab: a guided recording of the raw magnetometer field, for troubleshooting. Tap **Start diagnostic run** and follow the cards. Each step has a countdown and moves on by itself; **NEXT** skips ahead and **BACK** repeats the previous step. The 11 steps cover the lever held down, a slow sweep up, a hold at the top, a sweep down, a hold at the bottom, one slow crank revolution by hand, setting a middle gear, easy and fast pedalling, stopping, and an optional lean step (switch it off before starting). The whole run is about 2.5 minutes; the bridge can hold 8 minutes.
    When the run ends, the page downloads the recording, checks the sample count and checksum, and saves it. If anything was lost on the way, it says "Transfer incomplete"; tap **Retry**, because the bridge still has the recording. **CANCEL** needs a second tap and discards the run.
    Diagnostics need the bridge running **firmware v2 with recording** (`g`/`m`/`e`/`y`). With older firmware the page says so and does nothing else.
-5. **Console** tab: shows the bridge's text lines. Quick buttons send `h` (help), `p` (print calibration), `d` (debug stream, chatty) and, on v3 firmware, `t` (**Turns**: one line per pedal turn; the time of the last turn and its rpm appear above the log). The text box sends any single character. "Show machine lines" also shows the raw machine lines (only the first 10 `D` lines of each recording transfer).
+5. **Console** tab: shows the bridge's text lines. Quick buttons send `h` (help), `p` (print calibration), `d` (debug stream, chatty) and `t` (**Turns**: one line per pedal turn). Current v3 firmware sends the turn lines over USB only, so over Bluetooth this usually shows nothing; when turn lines do arrive, the time of the last turn and its rpm appear above the log. The text box sends any single character. "Show machine lines" also shows the raw machine lines (only the first 10 `D` lines of each recording transfer).
 
 If the connection drops, tap **Reconnect**. If it drops during a diagnostic run, reconnect and tap **Download recording**.
 
@@ -74,4 +76,5 @@ Extra options, added after `?demo=1`:
 - `&uncal=1`: start uncalibrated.
 - `&fast=1`: divide the diagnostic step times by 5 (the whole run takes about 35 s).
 - `&drop=1`: lose one line in the first recording transfer, to see "Transfer incomplete" and Retry.
+- `&stall=1`: hold back status lines for 3 s every 12 s, like a stalling Bluetooth link.
 - `&oldfw=1`: behave like firmware without recording, to see the "update to v2" message.
