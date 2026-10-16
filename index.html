@@ -1,0 +1,1371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0a0c0f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f6f9" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>M3 Bridge</title>
+<style>
+:root {
+  --bg: #0a0c0f;
+  --surface: #151a21;
+  --surface2: #1f262f;
+  --line: #2c3540;
+  --text: #f3f5f8;
+  --muted: #9ba6b5;
+  --accent: #4db2ff;
+  --accent-ink: #00121f;
+  --accent-bg: #0f2a40;
+  --ok: #3ddc84;
+  --ok-bg: #0e2d1c;
+  --warn: #ffb020;
+  --warn-bg: #3a2a07;
+  --bad: #ff5a5f;
+  --bad-bg: #3a1214;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Roboto Mono", monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --pad-l: max(16px, env(safe-area-inset-left));
+  --pad-r: max(16px, env(safe-area-inset-right));
+  --radius: 14px;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f6f9;
+    --surface: #ffffff;
+    --surface2: #e8ecf1;
+    --line: #cbd3dd;
+    --text: #0b0f14;
+    --muted: #4c5866;
+    --accent: #0063c2;
+    --accent-ink: #ffffff;
+    --accent-bg: #dcebfa;
+    --ok: #0f7d38;
+    --ok-bg: #dcf3e4;
+    --warn: #9a5600;
+    --warn-bg: #fdecc8;
+    --bad: #b01c22;
+    --bad-bg: #fbdcdc;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 18px;
+  line-height: 1.35;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; touch-action: manipulation; }
+button:disabled { opacity: .4; cursor: default; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- header ---------- */
+header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: env(safe-area-inset-top) var(--pad-r) 0 var(--pad-l);
+  min-height: calc(60px + env(safe-area-inset-top));
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+header h1 { font-size: 1.1rem; margin: 0; font-weight: 700; letter-spacing: .01em; white-space: nowrap; }
+.conn-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: .9rem; color: var(--muted); min-width: 0; flex: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.on { background: var(--ok); }
+.dot.busy { background: var(--warn); }
+.dot.off { background: var(--bad); }
+.hdr-btn {
+  flex: none; min-height: 48px; padding: 0 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface2); font-size: .9rem; font-weight: 600;
+}
+
+/* ---------- main ---------- */
+main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+.view { display: none; padding: 14px var(--pad-r) 18px var(--pad-l); flex: 1; min-height: 0; flex-direction: column; gap: 14px; }
+.view.active { display: flex; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.card h2 { margin: 0 0 6px; font-size: 1.2rem; }
+.card p { margin: 6px 0; }
+.muted { color: var(--muted); }
+.small { font-size: .88rem; }
+
+.btn {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  min-height: 56px; padding: 10px 18px; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--surface2);
+  font-size: 1.05rem; font-weight: 700; letter-spacing: .02em;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.danger { background: var(--bad-bg); border-color: var(--bad); color: var(--bad); }
+.btn.big { min-height: 72px; font-size: 1.35rem; width: 100%; }
+.btn.armed { background: var(--bad); color: #fff; border-color: var(--bad); }
+
+/* connection card */
+#connCard { margin: 14px var(--pad-r) 0 var(--pad-l); display: none; }
+#connCard.show { display: block; }
+#connCard .btn { margin-top: 12px; }
+#connMsg { margin: 0; }
+#connMsg.err { color: var(--bad); font-weight: 600; }
+
+/* ---------- ride ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 40px; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface);
+  font-size: .95rem; font-weight: 700; color: var(--muted);
+}
+.chip .k { font-family: var(--mono); font-size: .8rem; }
+.chip.on { color: var(--ok); background: var(--ok-bg); border-color: var(--ok); }
+.chip.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn); }
+.chip.bad { color: var(--bad); background: var(--bad-bg); border-color: var(--bad); }
+.chip[hidden] { display: none; }
+
+.gear-wrap {
+  flex: 1 0 auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 8px 12px 14px;
+}
+.gear-label { font-size: 1rem; font-weight: 800; letter-spacing: .25em; color: var(--muted); }
+.gear {
+  font-size: min(62vw, 40vh);
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.04em;
+  margin: 2px 0 4px;
+}
+.gear.dim { color: var(--muted); }
+.gear.hold { color: var(--warn); }
+.gear-note { font-size: 1.05rem; font-weight: 600; text-align: center; min-height: 1.4em; }
+.gear-note.warn { color: var(--warn); }
+.gear-note.bad { color: var(--bad); }
+#goCal { margin-top: 10px; }
+
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 8px 12px; text-align: center; min-width: 0; }
+.tile .v { font-size: clamp(1.9rem, 9.5vw, 3.2rem); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.05; overflow: hidden; text-overflow: clip; white-space: nowrap; }
+.tile .u { font-size: .85rem; font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+.stale .v, .stale.gear { opacity: .35; }
+
+/* ---------- calibrate ---------- */
+.switch-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 64px; padding: 8px 16px; width: 100%;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  text-align: left;
+}
+.switch-row .t { font-weight: 700; }
+.switch-row .s { font-size: .85rem; color: var(--muted); }
+.switch {
+  flex: none; width: 64px; height: 36px; border-radius: 999px; background: var(--surface2);
+  border: 2px solid var(--line); position: relative; transition: background .15s;
+}
+.switch::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--muted); transition: transform .15s, background .15s;
+}
+[aria-checked="true"] .switch { background: var(--ok); border-color: var(--ok); }
+[aria-checked="true"] .switch::after { transform: translateX(28px); background: #fff; }
+[aria-checked="mixed"] .switch::after { transform: translateX(14px); }
+
+.cal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.cal-point { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cal-count { color: var(--muted); font-size: .95rem; }
+.prompt {
+  font-size: 1.45rem; font-weight: 700; line-height: 1.25;
+  background: var(--accent-bg); border: 1px solid var(--accent); border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.prompt b { color: var(--accent); }
+.segs { display: grid; grid-template-columns: repeat(25, minmax(0, 1fr)); gap: 3px; }
+.seg { height: 14px; border-radius: 3px; background: var(--surface2); border: 1px solid var(--line); }
+.seg.done { background: var(--ok); border-color: var(--ok); }
+.seg.cur { background: var(--accent); border-color: var(--accent); }
+
+.meter { display: flex; align-items: center; gap: 16px; }
+.ring { width: 140px; height: 140px; flex: none; position: relative; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .track { stroke: var(--surface2); }
+.ring .fill { stroke: var(--accent); transition: stroke-dashoffset .22s linear, stroke .2s; }
+.ring.full .fill { stroke: var(--ok); }
+.ring.cap .fill { stroke: var(--warn); }
+.ring .pct {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 2.2rem; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.meter-text .t { font-size: 1.25rem; font-weight: 800; }
+.meter-text .s { color: var(--muted); font-size: .92rem; margin-top: 4px; }
+
+.cal-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cal-btns .capture { grid-column: 1 / -1; min-height: 84px; font-size: 1.6rem; }
+.cal-btns .btn { min-height: 64px; }
+
+.plist { max-height: 260px; overflow-y: auto; border-top: 1px solid var(--line); margin-top: 8px; }
+.prow {
+  display: grid; grid-template-columns: 2.4em 4.6em minmax(0, 1fr) auto; gap: 8px; align-items: baseline;
+  padding: 7px 2px; border-bottom: 1px solid var(--line); font-size: .92rem;
+}
+.prow .n { font-weight: 800; font-variant-numeric: tabular-nums; }
+.prow .xyz { font-family: var(--mono); font-size: .8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prow .d { font-family: var(--mono); font-size: .85rem; font-weight: 700; text-align: right; }
+.prow .d.marg { color: var(--warn); }
+
+.result.ok { border-color: var(--ok); background: var(--ok-bg); }
+.result.bad { border-color: var(--bad); background: var(--bad-bg); }
+.result.warn { border-color: var(--warn); background: var(--warn-bg); }
+.result h2 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.result .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.result .stat .v { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.result .stat .u { font-size: .85rem; color: var(--muted); font-weight: 700; }
+.result .marginal { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); font-weight: 600; }
+.x-btn { min-width: 48px; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 1.2rem; font-weight: 700; }
+ol.steps { margin: 8px 0 0; padding-left: 1.3em; }
+ol.steps li { margin: 4px 0; }
+
+/* ---------- console ---------- */
+#view-console { gap: 10px; }
+.log {
+  flex: 1; min-height: 180px; overflow-y: auto; overflow-x: hidden;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 8px 10px; font-family: var(--mono); font-size: .82rem; line-height: 1.4;
+  overflow-wrap: anywhere; white-space: pre-wrap;
+}
+.log .ln { padding: 1px 0; }
+.log .ts { color: var(--muted); margin-right: 6px; }
+.log .raw { color: var(--muted); }
+.log .bad { color: var(--bad); }
+.log .sent { color: var(--accent); }
+.log .sys { color: var(--warn); }
+.qbtns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.qbtns .btn { padding: 6px 4px; font-size: .95rem; flex-direction: column; gap: 0; }
+.qbtns .btn .k { font-family: var(--mono); font-size: .8rem; color: var(--muted); font-weight: 600; }
+.sendrow { display: flex; gap: 8px; }
+.sendrow input {
+  flex: 1; min-width: 0; min-height: 56px; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--surface); padding: 0 16px; font-family: var(--mono); font-size: 1.3rem;
+}
+.sendrow .btn { min-width: 96px; }
+
+/* ---------- tab bar ---------- */
+nav {
+  flex: none;
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+nav button {
+  min-height: 64px; border: 0; background: transparent; color: var(--muted);
+  font-size: 1.05rem; font-weight: 700; letter-spacing: .02em;
+  border-top: 4px solid transparent;
+}
+nav button[aria-selected="true"] { color: var(--text); border-top-color: var(--accent); }
+nav button .badge { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); margin-left: 6px; vertical-align: middle; }
+
+#toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  max-width: calc(100% - 32px);
+  background: var(--text); color: var(--bg); padding: 12px 18px; border-radius: 12px;
+  font-weight: 600; font-size: .95rem; opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+#toast.show { opacity: 1; }
+
+@media (orientation: landscape) and (max-height: 540px) {
+  #view-ride.active { display: grid; grid-template-columns: 1.1fr 1fr; grid-template-rows: auto 1fr; }
+  #view-ride .chips { grid-column: 1 / -1; }
+  #view-ride .tiles { grid-template-columns: 1fr; align-content: center; }
+  #view-ride .tiles { gap: 6px; }
+  #view-ride .tile { padding: 4px 8px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  #view-ride .tile .v { font-size: 1.9rem; }
+  #view-ride .gear-wrap { padding: 4px 8px; }
+  .gear { font-size: min(36vh, 30vw); }
+  header { min-height: calc(52px + env(safe-area-inset-top)); }
+  nav button { min-height: 56px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>M3 Bridge</h1>
+  <span class="conn-pill" aria-live="polite"><span class="dot" id="connDot"></span><span id="connText">Not connected</span></span>
+  <button class="hdr-btn" id="hdrBtn" type="button" hidden>Disconnect</button>
+</header>
+
+<main id="main">
+  <div class="card" id="connCard">
+    <p id="connMsg" class="muted">Connect to your Keiser M3 Bridge to begin.</p>
+    <button class="btn primary big" id="connectBtn" type="button">Connect</button>
+    <p class="small muted" id="demoHint" hidden style="margin-top:12px">No hardware? <a id="demoLink" href="?demo=1" style="color:var(--accent)">Try demo mode</a>.</p>
+  </div>
+
+  <!-- RIDE -->
+  <section class="view" id="view-ride" aria-label="Ride">
+    <div class="chips" id="chips">
+      <span class="chip" id="chipP"><span class="k">P</span>Pod</span>
+      <span class="chip" id="chipZ"><span class="k">Z</span>Zwift</span>
+      <span class="chip" id="chipV"><span class="k">V</span>Calibrated</span>
+      <span class="chip bad" id="chipS" hidden><span class="k">S</span>Saturated</span>
+      <span class="chip warn" id="chipH" hidden><span class="k">H</span><span id="chipHText">Off-path hold</span></span>
+    </div>
+    <div class="gear-wrap">
+      <div class="gear-label">GEAR</div>
+      <div class="gear dim" id="gear">--</div>
+      <div class="gear-note" id="gearNote">Waiting for data</div>
+      <button class="btn primary" id="goCal" type="button" hidden>Go to Calibrate</button>
+    </div>
+    <div class="tiles" id="tiles">
+      <div class="tile"><div class="v" id="watts">--</div><div class="u">Watts</div></div>
+      <div class="tile"><div class="v" id="cad">--</div><div class="u">RPM</div></div>
+      <div class="tile"><div class="v" id="res">--</div><div class="u">Resist %</div></div>
+    </div>
+  </section>
+
+  <!-- CALIBRATE -->
+  <section class="view" id="view-cal" aria-label="Calibrate">
+    <div class="card result" id="resultCard" hidden></div>
+
+    <div id="calIdle">
+      <div class="card">
+        <h2>Calibrate gears</h2>
+        <p class="muted">You will record 25 lever positions. Hold the lever still at each one.</p>
+        <ol class="steps muted small">
+          <li>Point 1: gear lever all the way down.</li>
+          <li>Points 2 to 24: move the lever up until the console first shows the next gear, then stop pedalling.</li>
+          <li>Point 25: gear lever all the way up.</li>
+        </ol>
+        <p class="muted small">With auto-capture on, each point is taken once the reading has held steady for about 2 seconds. Otherwise tap CAPTURE.</p>
+        <button class="btn primary big" id="calStart" type="button" style="margin-top:12px">Start calibration</button>
+      </div>
+    </div>
+
+    <div id="calActive" hidden>
+      <div class="cal-head">
+        <div class="cal-point" id="calPoint" aria-live="polite">Point 1 of 25</div>
+        <div class="cal-count" id="calCount">0 captured</div>
+      </div>
+      <div class="segs" id="segs" aria-hidden="true"></div>
+      <div class="prompt" id="calPrompt" aria-live="polite"></div>
+      <div class="meter">
+        <div class="ring" id="ring">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="track" cx="60" cy="60" r="52" fill="none" stroke-width="12"></circle>
+            <circle class="fill" id="ringFill" cx="60" cy="60" r="52" fill="none" stroke-width="12" stroke-linecap="round" stroke-dasharray="326.73" stroke-dashoffset="326.73"></circle>
+          </svg>
+          <div class="pct" id="ringPct">0</div>
+        </div>
+        <div class="meter-text">
+          <div class="t" id="meterTitle">Hold steady</div>
+          <div class="s" id="meterSub"></div>
+        </div>
+      </div>
+      <div class="cal-btns">
+        <button class="btn primary capture" id="btnCapture" type="button">CAPTURE</button>
+        <button class="btn" id="btnUndo" type="button">UNDO</button>
+        <button class="btn danger" id="btnCancel" type="button">CANCEL</button>
+      </div>
+    </div>
+
+    <button class="switch-row" id="autoToggle" type="button" role="switch" aria-checked="mixed">
+      <span><span class="t">Auto-capture</span><br><span class="s" id="autoSub">Waiting for status</span></span>
+      <span class="switch" aria-hidden="true"></span>
+    </button>
+
+    <div class="card" id="pointsCard" hidden>
+      <h2>Captured points</h2>
+      <div class="small muted">x, y, z in µT. Right column: distance from the previous point (µT).</div>
+      <div class="plist" id="plist"></div>
+    </div>
+  </section>
+
+  <!-- CONSOLE -->
+  <section class="view" id="view-console" aria-label="Console">
+    <div class="log" id="log" role="log" aria-live="off"></div>
+    <button class="switch-row" id="rawToggle" type="button" role="switch" aria-checked="false">
+      <span><span class="t">Show machine lines</span><br><span class="s">S, C, K, A, U lines as received</span></span>
+      <span class="switch" aria-hidden="true"></span>
+    </button>
+    <div class="qbtns">
+      <button class="btn" type="button" data-cmd="h">Help<span class="k">h</span></button>
+      <button class="btn" type="button" data-cmd="p">Print cal<span class="k">p</span></button>
+      <button class="btn" type="button" data-cmd="d">Debug<span class="k">d</span></button>
+      <button class="btn" type="button" id="clearLog">Clear<span class="k">log</span></button>
+    </div>
+    <form class="sendrow" id="sendForm" autocomplete="off">
+      <input id="sendInput" maxlength="1" placeholder="1 char" aria-label="Command character" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
+      <button class="btn primary" type="submit">Send</button>
+    </form>
+    <p class="small muted" style="margin:0">Debug (d) is chatty. Send it again to turn it off.</p>
+  </section>
+</main>
+
+<nav role="tablist" aria-label="Views">
+  <button type="button" role="tab" data-view="ride" aria-selected="true">Ride</button>
+  <button type="button" role="tab" data-view="cal" aria-selected="false">Calibrate<span class="badge" id="calBadge" hidden></span></button>
+  <button type="button" role="tab" data-view="console" aria-selected="false">Console</button>
+</nav>
+
+<div id="toast" role="status"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ===================================================================
+  // Constants (see bench/PROTOCOL.md)
+  // ===================================================================
+  var NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+  var NUS_RX      = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // page writes commands here
+  var NUS_TX      = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // board notifies lines here
+  var NAME_PREFIX = 'Keiser M3 Bridge';
+  var TOTAL_POINTS = 25;
+  var MARGINAL_UT = 1.5;
+  var STALE_MS = 2000;
+  var LOG_MAX = 600;
+  var RX_BUF_MAX = 2048;
+
+  var params;
+  try { params = new URLSearchParams(location.search); } catch (e) { params = { get: function () { return null; } }; }
+  var DEMO = params.get('demo') === '1';
+  var DEMO_UNCAL = params.get('uncal') === '1';
+
+  function $(id) { return document.getElementById(id); }
+
+  // ===================================================================
+  // App state
+  // ===================================================================
+  var state = {
+    conn: 'idle',        // idle | connecting | connected | disconnected | unsupported
+    s: null,             // last parsed S line
+    sAt: 0,              // time of last S line
+    prevCal: 0,
+    points: [],          // [{point, x, y, z}]
+    result: null,        // {type:'K', ok, span, minstep, minAt, msg} | {type:'A', reason}
+    showRaw: false,
+    view: 'ride'
+  };
+
+  // ===================================================================
+  // Defensive number parsing
+  // ===================================================================
+  function num(s) {
+    if (s === undefined || s === null) return NaN;
+    var t = String(s).trim();
+    if (t === '') return NaN;
+    var v = Number(t);
+    return isFinite(v) ? v : NaN;
+  }
+  function int(s) { var v = num(s); return isFinite(v) ? Math.round(v) : NaN; }
+  function fin(v) { return typeof v === 'number' && isFinite(v); }
+  function fmt(v, d) { return fin(v) ? v.toFixed(d) : '--'; }
+
+  // ===================================================================
+  // Line assembly: notification chunks (<=20 bytes) -> text -> lines
+  // ===================================================================
+  var rxBuf = '';
+  var decoder = makeDecoder();
+  function makeDecoder() { try { return new TextDecoder('utf-8'); } catch (e) { return null; } }
+  function resetRx() { rxBuf = ''; decoder = makeDecoder(); }
+
+  function onBytes(u8) {
+    var text = '';
+    try {
+      if (decoder) text = decoder.decode(u8, { stream: true });
+      else for (var i = 0; i < u8.length; i++) text += String.fromCharCode(u8[i]);
+    } catch (e) { return; }
+    rxBuf += text;
+    var idx;
+    while ((idx = rxBuf.indexOf('\n')) >= 0) {
+      var line = rxBuf.slice(0, idx);
+      rxBuf = rxBuf.slice(idx + 1);
+      handleLine(line);
+    }
+    if (rxBuf.length > RX_BUF_MAX) { console.warn('RX buffer overflow without newline; dropped'); rxBuf = ''; }
+  }
+
+  function onNotify(ev) {
+    var dv = ev && ev.target && ev.target.value;
+    if (!dv || !dv.buffer) return;
+    onBytes(new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength));
+  }
+
+  // ===================================================================
+  // Line parser
+  // ===================================================================
+  var MACHINE_RE = /^([SCKAU]),/;
+
+  function handleLine(raw) {
+    var line = String(raw).replace(/[\r\0]/g, '').replace(/\s+$/, '');
+    if (!line.trim()) return;
+    var m = MACHINE_RE.exec(line);
+    if (!m) { logLine(line, 'human'); return; }
+    var parts = line.split(',');
+    var ok = false;
+    try {
+      switch (m[1]) {
+        case 'S': ok = onS(parts); break;
+        case 'C': ok = onC(parts); break;
+        case 'K': ok = onK(parts); break;
+        case 'A': ok = onA(parts); break;
+        case 'U': ok = onU(parts); break;
+      }
+    } catch (e) { console.warn('parse error', line, e); ok = false; }
+    if (state.showRaw || !ok) logLine(ok ? line : line + '   (malformed, ignored)', ok ? 'raw' : 'rawbad');
+  }
+
+  // S,<gear>,<res>,<watts>,<cad>,<cal>,<step>,<stab>,<off>,<flags>
+  function onS(p) {
+    if (p.length < 9) return false;
+    var gear = int(p[1]), cal = int(p[5]);
+    if (!fin(gear) || gear < 0 || gear > 99) return false;
+    if (!fin(cal) || cal < 0 || cal > 2) return false;
+    var flagStr = (p[9] || '').trim();
+    var flags = {};
+    for (var i = 0; i < flagStr.length; i++) flags[flagStr.charAt(i)] = true;
+    var step = int(p[6]);
+    var stab = num(p[7]);
+    var s = {
+      gear: gear,
+      res: num(p[2]),
+      watts: int(p[3]),
+      cad: num(p[4]),
+      cal: cal,
+      step: fin(step) ? Math.max(0, Math.min(TOTAL_POINTS - 1, step)) : 0,
+      stab: fin(stab) ? Math.max(0, Math.min(100, stab)) : 0,
+      off: num(p[8]),
+      flags: flags,
+      flagStr: flagStr
+    };
+    var prevCal = state.s ? state.s.cal : 0;
+    state.s = s;
+    state.sAt = Date.now();
+    if (prevCal === 0 && cal !== 0) onCalStarted();
+    render();
+    return true;
+  }
+
+  // C,<point>,<x>,<y>,<z>
+  function onC(p) {
+    if (p.length < 2) return false;
+    var point = int(p[1]);
+    if (!fin(point) || point < 1 || point > TOTAL_POINTS) return false;
+    var pt = { point: point, x: num(p[2]), y: num(p[3]), z: num(p[4]) };
+    state.points = state.points.filter(function (q) { return q.point < point; });
+    state.points.push(pt);
+    try { if (navigator.vibrate) navigator.vibrate(40); } catch (e) {}
+    renderPoints();
+    flashCapture();
+    return true;
+  }
+
+  // K,<ok>,<span>,<minstep>,<minstepAt>,<msg>
+  function onK(p) {
+    if (p.length < 2) return false;
+    var okStr = p[1].trim();
+    if (okStr !== '0' && okStr !== '1') return false;
+    var r = {
+      type: 'K', ok: okStr === '1',
+      span: num(p[2]), minstep: num(p[3]), minAt: int(p[4]),
+      msg: p.slice(5).join(',').trim()
+    };
+    state.result = r;
+    logLine(r.ok
+      ? 'Calibration saved: span ' + fmt(r.span, 1) + ' µT, smallest step ' + fmt(r.minstep, 1) + ' µT at gear ' + (fin(r.minAt) ? r.minAt : '?')
+      : 'Calibration rejected: ' + (r.msg || 'no reason given'), 'sys');
+    try { if (navigator.vibrate) navigator.vibrate(r.ok ? [60, 60, 60] : [300]); } catch (e) {}
+    renderResult();
+    renderBadge();
+    return true;
+  }
+
+  // A,<reason>
+  function onA(p) {
+    var reason = p.slice(1).join(',').trim();
+    state.result = { type: 'A', reason: reason || 'no reason given' };
+    logLine('Calibration aborted: ' + state.result.reason, 'sys');
+    renderResult();
+    renderBadge();
+    return true;
+  }
+
+  // U,<step>
+  function onU(p) {
+    if (p.length < 2) return false;
+    var step = int(p[1]);
+    if (!fin(step) || step < 0 || step >= TOTAL_POINTS) return false;
+    // After undo the current step is <step>, so points 1..step remain captured.
+    state.points = state.points.filter(function (q) { return q.point <= step; });
+    if (state.s) state.s.step = step;
+    renderPoints();
+    render();
+    return true;
+  }
+
+  function onCalStarted() {
+    state.points = [];
+    state.result = null;
+    renderPoints();
+    renderResult();
+  }
+
+  // ===================================================================
+  // Command writes: one char per write, serialized through a promise queue
+  // ===================================================================
+  var writeChain = Promise.resolve();
+  var enc = (typeof TextEncoder !== 'undefined') ? new TextEncoder() : null;
+
+  function send(str, quiet) {
+    if (state.conn !== 'connected') { toast('Not connected'); return; }
+    var chars = String(str).split('');
+    chars.forEach(function (c) {
+      var code = c.charCodeAt(0);
+      if (code < 32 || code > 126) return;
+      if (!quiet) logLine('> ' + c, 'sent');
+      writeChain = writeChain
+        .then(function () { return writeChar(c); })
+        .catch(function (err) {
+          logLine('Write failed (' + c + '): ' + (err && err.message ? err.message : err), 'bad');
+        });
+    });
+    return writeChain;
+  }
+
+  function writeChar(c) {
+    if (DEMO) { sim.receive(c); return Promise.resolve(); }
+    if (!rxChar) return Promise.reject(new Error('not connected'));
+    var data = enc ? enc.encode(c) : new Uint8Array([c.charCodeAt(0)]);
+    var props = rxChar.properties || {};
+    if (typeof rxChar.writeValueWithoutResponse === 'function' && props.writeWithoutResponse !== false) {
+      return rxChar.writeValueWithoutResponse(data);
+    }
+    if (typeof rxChar.writeValueWithResponse === 'function' && props.write) {
+      return rxChar.writeValueWithResponse(data);
+    }
+    return rxChar.writeValue(data);
+  }
+
+  // ===================================================================
+  // Bluetooth transport
+  // ===================================================================
+  var device = null, rxChar = null, txChar = null, userDisconnect = false;
+
+  function errText(e) {
+    if (!e) return 'Unknown error';
+    if (e.name === 'NotFoundError') return 'No bridge selected.';
+    if (e.name === 'SecurityError') return 'Bluetooth was blocked. The page must be opened over https or from a local file, and Bluetooth permission must be allowed.';
+    if (e.name === 'NetworkError') return 'Could not reach the bridge. Make sure it is powered and in range, then try again.';
+    return e.message || String(e);
+  }
+
+  function connectClick() {
+    if (DEMO) { demoConnect(); return; }
+    if (!navigator.bluetooth) { setConn('unsupported'); return; }
+    if (device && state.conn === 'disconnected') { reconnect(); return; }
+    setConn('connecting', 'Choose "' + NAME_PREFIX + '" in the list.');
+    // requestDevice must be the first await inside the user gesture.
+    navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: NAME_PREFIX }],
+      optionalServices: [NUS_SERVICE]
+    }).then(function (dev) {
+      if (device && device !== dev) {
+        try { device.removeEventListener('gattserverdisconnected', onGattDisconnected); } catch (e) {}
+      }
+      device = dev;
+      device.removeEventListener('gattserverdisconnected', onGattDisconnected);
+      device.addEventListener('gattserverdisconnected', onGattDisconnected);
+      return openGatt();
+    }).catch(function (e) {
+      setConn(device ? 'disconnected' : 'idle', errText(e), e && e.name !== 'NotFoundError');
+    });
+  }
+
+  function openGatt() {
+    setConn('connecting', 'Connecting to ' + (device.name || 'bridge') + '...');
+    return device.gatt.connect().then(function (server) {
+      return server.getPrimaryService(NUS_SERVICE);
+    }).then(function (svc) {
+      return Promise.all([svc.getCharacteristic(NUS_RX), svc.getCharacteristic(NUS_TX)]);
+    }).then(function (chars) {
+      rxChar = chars[0];
+      if (txChar) { try { txChar.removeEventListener('characteristicvaluechanged', onNotify); } catch (e) {} }
+      txChar = chars[1];
+      resetRx();
+      txChar.addEventListener('characteristicvaluechanged', onNotify);
+      return txChar.startNotifications();
+    }).then(function () {
+      writeChain = Promise.resolve();
+      setConn('connected');
+      send('1', true); // status stream on
+    }).catch(function (e) {
+      try { if (device && device.gatt && device.gatt.connected) device.gatt.disconnect(); } catch (x) {}
+      rxChar = null;
+      throw e;
+    });
+  }
+
+  function reconnect() {
+    if (DEMO) { demoConnect(); return; }
+    if (!device) { connectClick(); return; }
+    openGatt().catch(function (e) { setConn('disconnected', 'Reconnect failed: ' + errText(e), true); });
+  }
+
+  function onGattDisconnected() {
+    rxChar = null;
+    var msg = userDisconnect ? 'Disconnected.' : 'Connection lost. Tap Reconnect.';
+    userDisconnect = false;
+    if (state.conn !== 'connecting') setConn('disconnected', msg, false);
+  }
+
+  function disconnect() {
+    userDisconnect = true;
+    if (DEMO) { sim.disconnect(); onGattDisconnected(); return; }
+    try { if (device && device.gatt && device.gatt.connected) device.gatt.disconnect(); else onGattDisconnected(); } catch (e) { onGattDisconnected(); }
+  }
+
+  // ===================================================================
+  // Connection UI
+  // ===================================================================
+  function setConn(c, msg, isErr) {
+    state.conn = c;
+    var dot = $('connDot'), txt = $('connText'), card = $('connCard'), btn = $('connectBtn'), cm = $('connMsg'), hb = $('hdrBtn');
+    dot.className = 'dot';
+    hb.hidden = true;
+    btn.disabled = false;
+    cm.className = isErr ? 'err' : 'muted';
+    $('demoHint').hidden = true;
+    var label = DEMO ? ' (demo)' : '';
+    switch (c) {
+      case 'idle':
+        txt.textContent = 'Not connected' + label;
+        card.classList.add('show');
+        btn.textContent = DEMO ? 'Connect to simulator' : 'Connect';
+        cm.textContent = msg || (DEMO ? 'Demo mode: a built-in simulator stands in for the bridge.' : 'Connect to your Keiser M3 Bridge to begin.');
+        break;
+      case 'connecting':
+        dot.classList.add('busy');
+        txt.textContent = 'Connecting' + label;
+        card.classList.add('show');
+        btn.textContent = 'Connecting...';
+        btn.disabled = true;
+        cm.textContent = msg || 'Connecting...';
+        break;
+      case 'connected':
+        dot.classList.add('on');
+        txt.textContent = DEMO ? 'Simulator' : 'Connected';
+        card.classList.remove('show');
+        hb.hidden = false;
+        keepAwake(true);
+        logLine(DEMO ? 'Connected to simulator.' : 'Connected.', 'sys');
+        break;
+      case 'disconnected':
+        dot.classList.add('off');
+        txt.textContent = 'Disconnected' + label;
+        card.classList.add('show');
+        btn.textContent = 'Reconnect';
+        cm.textContent = msg || 'Disconnected.';
+        state.s = null;
+        keepAwake(false);
+        logLine(msg || 'Disconnected.', 'sys');
+        break;
+      case 'unsupported':
+        txt.textContent = 'Bluetooth unavailable';
+        card.classList.add('show');
+        btn.textContent = 'Connect';
+        btn.disabled = true;
+        cm.className = 'err';
+        cm.textContent = 'This browser has no Web Bluetooth. Open this page in Bluefy on iPhone, or Chrome on Android/desktop.';
+        $('demoHint').hidden = false;
+        break;
+    }
+    render();
+  }
+
+  // ===================================================================
+  // Screen wake lock
+  // ===================================================================
+  var wakeLock = null;
+  function keepAwake(on) {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      if (on && !wakeLock) {
+        navigator.wakeLock.request('screen').then(function (wl) {
+          wakeLock = wl;
+          wl.addEventListener('release', function () { wakeLock = null; });
+        }).catch(function () {});
+      } else if (!on && wakeLock) {
+        var w = wakeLock; wakeLock = null;
+        w.release().catch(function () {});
+      }
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && state.conn === 'connected') keepAwake(true);
+  });
+
+  // ===================================================================
+  // Rendering
+  // ===================================================================
+  function isStale() { return !state.s || (Date.now() - state.sAt) > STALE_MS; }
+
+  function setChip(id, on, cls) {
+    var el = $(id);
+    el.classList.remove('on', 'warn', 'bad');
+    if (on) el.classList.add(cls || 'on');
+  }
+
+  function render() {
+    renderRide();
+    renderCal();
+    renderBadge();
+  }
+
+  function renderRide() {
+    var s = state.s, stale = isStale(), connected = state.conn === 'connected';
+    var gearEl = $('gear'), note = $('gearNote'), goCal = $('goCal');
+    var f = (s && !stale) ? s.flags : {};
+    setChip('chipP', !!f.P);
+    setChip('chipZ', !!f.Z);
+    setChip('chipV', !!f.V);
+    $('chipS').hidden = !f.S;
+    $('chipH').hidden = !f.H;
+    $('chipHText').textContent = 'Hold, off ' + fmt(s ? s.off : NaN, 1) + ' µT';
+
+    gearEl.className = 'gear';
+    note.className = 'gear-note';
+    goCal.hidden = true;
+    $('tiles').classList.toggle('stale', stale);
+
+    if (!s) {
+      gearEl.textContent = '--';
+      gearEl.classList.add('dim');
+      note.textContent = connected ? 'Waiting for data' : 'Not connected';
+      $('watts').textContent = '--'; $('cad').textContent = '--'; $('res').textContent = '--';
+      return;
+    }
+    $('watts').textContent = fin(s.watts) ? String(s.watts) : '--';
+    $('cad').textContent = fmt(s.cad, 0);
+    $('res').textContent = fmt(s.res, 0);
+
+    var calibrated = s.gear > 0 && !!s.flags.V;
+    if (stale) {
+      gearEl.textContent = calibrated ? String(s.gear) : '--';
+      gearEl.classList.add('dim');
+      note.textContent = 'No status data. Is the stream off?';
+      note.classList.add('warn');
+      return;
+    }
+    if (!calibrated) {
+      gearEl.textContent = '--';
+      gearEl.classList.add('dim');
+      note.textContent = s.cal !== 0 ? 'Calibration in progress' : 'Not calibrated — go to Calibrate';
+      note.classList.add('warn');
+      goCal.hidden = false;
+      return;
+    }
+    gearEl.textContent = String(s.gear);
+    if (s.flags.S) {
+      note.textContent = 'Magnetometer saturated';
+      note.classList.add('bad');
+    } else if (s.flags.H) {
+      gearEl.classList.add('hold');
+      note.textContent = 'Holding last good gear (off ' + fmt(s.off, 1) + ' µT)';
+      note.classList.add('warn');
+    } else if (s.cal !== 0) {
+      note.textContent = 'Calibration in progress';
+    } else {
+      note.textContent = '';
+    }
+  }
+
+  function promptHtml(step) {
+    if (step <= 0) return 'Push the gear lever ALL THE WAY DOWN';
+    if (step >= 24) return 'Push the gear lever ALL THE WAY UP';
+    return 'Move the lever up until the console FIRST shows gear <b>' + (step + 1) + '</b>, then stop pedalling';
+  }
+
+  var RING_C = 2 * Math.PI * 52;
+  var lastStepRendered = -1;
+
+  function renderCal() {
+    var s = state.s, connected = state.conn === 'connected';
+    var active = !!(s && s.cal !== 0 && !isStale());
+    $('calIdle').hidden = active;
+    $('calActive').hidden = !active;
+    $('calStart').disabled = !connected || !s;
+    $('calStart').textContent = connected ? 'Start calibration' : 'Connect first';
+
+    // auto-capture toggle reflects the A flag
+    var at = $('autoToggle');
+    if (s) {
+      at.setAttribute('aria-checked', s.flags.A ? 'true' : 'false');
+      $('autoSub').textContent = s.flags.A ? 'On: captures after ~2 s held steady' : 'Off: tap CAPTURE for each point';
+    } else {
+      at.setAttribute('aria-checked', 'mixed');
+      $('autoSub').textContent = connected ? 'Waiting for status' : 'Not connected';
+    }
+    at.disabled = !connected;
+
+    $('pointsCard').hidden = state.points.length === 0 && !active;
+
+    if (!active) { lastStepRendered = -1; return; }
+
+    var step = s.step;
+    $('calPoint').textContent = 'Point ' + (step + 1) + ' of ' + TOTAL_POINTS;
+    $('calCount').textContent = step + ' captured';
+    if (step !== lastStepRendered) {
+      $('calPrompt').innerHTML = promptHtml(step);
+      lastStepRendered = step;
+    }
+    var segs = $('segs');
+    if (segs.children.length !== TOTAL_POINTS) {
+      segs.innerHTML = '';
+      for (var i = 0; i < TOTAL_POINTS; i++) { var d = document.createElement('div'); d.className = 'seg'; segs.appendChild(d); }
+    }
+    for (var j = 0; j < TOTAL_POINTS; j++) {
+      segs.children[j].className = 'seg' + (j < step ? ' done' : (j === step ? ' cur' : ''));
+    }
+
+    var stab = Math.round(s.stab);
+    var ring = $('ring');
+    $('ringFill').setAttribute('stroke-dashoffset', String(RING_C * (1 - stab / 100)));
+    $('ringPct').textContent = String(stab);
+    ring.classList.toggle('full', stab >= 100 && s.cal !== 2);
+    ring.classList.toggle('cap', s.cal === 2);
+    var title, sub;
+    if (s.cal === 2) { title = 'Capturing...'; sub = 'Averaging. Keep the lever still.'; }
+    else if (stab >= 100 && !s.flags.A) { title = 'Steady'; sub = 'Tap CAPTURE to record this point.'; }
+    else if (stab >= 100) { title = 'Steady'; sub = 'About to capture.'; }
+    else if (stab > 0) { title = 'Hold steady'; sub = s.flags.A ? 'Auto-capture when the ring fills.' : 'Tap CAPTURE when ready.'; }
+    else { title = 'Set the lever'; sub = 'Then stop moving it.'; }
+    $('meterTitle').textContent = title;
+    $('meterSub').textContent = sub;
+
+    $('btnCapture').disabled = !connected || s.cal === 2;
+    $('btnUndo').disabled = !connected || step === 0;
+    $('btnCancel').disabled = !connected;
+  }
+
+  function renderBadge() {
+    var b = $('calBadge');
+    var calActive = state.s && state.s.cal !== 0;
+    b.hidden = state.view === 'cal' || !(calActive || (state.result && state.result.type));
+  }
+
+  function pointLabel(n) {
+    if (n === 1) return 'Bottom';
+    if (n === TOTAL_POINTS) return 'Top';
+    return 'Gear ' + n;
+  }
+
+  function renderPoints() {
+    var list = $('plist');
+    var pts = state.points.slice().sort(function (a, b) { return a.point - b.point; });
+    var html = '';
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i], prev = i > 0 && pts[i - 1].point === p.point - 1 ? pts[i - 1] : null;
+      var dist = NaN;
+      if (prev && fin(p.x) && fin(p.y) && fin(p.z) && fin(prev.x) && fin(prev.y) && fin(prev.z)) {
+        dist = Math.sqrt(Math.pow(p.x - prev.x, 2) + Math.pow(p.y - prev.y, 2) + Math.pow(p.z - prev.z, 2));
+      }
+      html += '<div class="prow"><span class="n">' + p.point + '</span><span>' + pointLabel(p.point) +
+        '</span><span class="xyz">' + fmt(p.x, 1) + ', ' + fmt(p.y, 1) + ', ' + fmt(p.z, 1) +
+        '</span><span class="d' + (fin(dist) && dist < MARGINAL_UT ? ' marg' : '') + '">' +
+        (fin(dist) ? 'Δ ' + dist.toFixed(1) : '') + '</span></div>';
+    }
+    list.innerHTML = html;
+    list.scrollTop = list.scrollHeight;
+    renderCal();
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  }
+
+  function renderResult() {
+    var card = $('resultCard'), r = state.result;
+    if (!r) { card.hidden = true; card.innerHTML = ''; return; }
+    card.hidden = false;
+    var close = '<button class="x-btn" type="button" data-dismiss aria-label="Dismiss">×</button>';
+    var html;
+    if (r.type === 'K') {
+      var marginal = r.ok && fin(r.minstep) && r.minstep < MARGINAL_UT;
+      card.className = 'card result ' + (r.ok ? (marginal ? 'warn' : 'ok') : 'bad');
+      html = '<h2>' + (r.ok ? 'Calibration saved' : 'Calibration rejected') + close + '</h2>';
+      if (!r.ok) html += '<p><b>' + esc(r.msg || 'No reason given') + '</b></p>';
+      else if (r.msg && r.msg.toLowerCase() !== 'saved') html += '<p>' + esc(r.msg) + '</p>';
+      html += '<div class="stats">' +
+        '<div class="stat"><div class="v">' + fmt(r.span, 1) + '</div><div class="u">Span (µT)</div></div>' +
+        '<div class="stat"><div class="v">' + fmt(r.minstep, 1) + '</div><div class="u">Smallest step (µT)' +
+        (fin(r.minAt) ? ' (gear ' + r.minAt + ')' : '') + '</div></div></div>';
+      if (marginal) {
+        html += '<div class="marginal">Marginal: the smallest step (' + fmt(r.minstep, 1) + ' µT at gear ' +
+          (fin(r.minAt) ? r.minAt : '?') + ') is under ' + MARGINAL_UT + ' µT. That gear may flicker. Consider moving the sensor closer to the magnet and recalibrating.</div>';
+      }
+      if (!r.ok) html += '<p class="small">Tap Start calibration to try again.</p>';
+    } else {
+      card.className = 'card result bad';
+      html = '<h2>Calibration aborted' + close + '</h2><p><b>' + esc(r.reason) + '</b></p>' +
+        '<p class="small">The previous calibration (if any) is unchanged.</p>';
+    }
+    card.innerHTML = html;
+  }
+
+  function flashCapture() {
+    var ring = $('ring');
+    ring.style.transform = 'scale(1.08)';
+    setTimeout(function () { ring.style.transform = ''; }, 180);
+  }
+
+  // ===================================================================
+  // Console log
+  // ===================================================================
+  function ts() {
+    var d = new Date();
+    function z(n) { return (n < 10 ? '0' : '') + n; }
+    return z(d.getHours()) + ':' + z(d.getMinutes()) + ':' + z(d.getSeconds());
+  }
+  // Follow new lines unless the user has scrolled up to read history.
+  var logStick = true;
+  $('log').addEventListener('scroll', function () {
+    var l = $('log');
+    if (l.clientHeight > 0) logStick = l.scrollHeight - l.scrollTop - l.clientHeight < 40;
+  });
+  function logLine(text, kind) {
+    var log = $('log');
+    var div = document.createElement('div');
+    div.className = 'ln' + (kind === 'raw' ? ' raw' : kind === 'rawbad' || kind === 'bad' ? ' bad' : kind === 'sent' ? ' sent' : kind === 'sys' ? ' sys' : '');
+    var t = document.createElement('span'); t.className = 'ts'; t.textContent = ts();
+    div.appendChild(t);
+    div.appendChild(document.createTextNode(text));
+    log.appendChild(div);
+    while (log.childNodes.length > LOG_MAX) log.removeChild(log.firstChild);
+    if (logStick) log.scrollTop = log.scrollHeight;
+  }
+
+  // ===================================================================
+  // Toast
+  // ===================================================================
+  var toastTimer = 0;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1800);
+  }
+
+  // ===================================================================
+  // Tabs
+  // ===================================================================
+  function showView(v) {
+    if (['ride', 'cal', 'console'].indexOf(v) < 0) v = 'ride';
+    state.view = v;
+    var views = { ride: 'view-ride', cal: 'view-cal', console: 'view-console' };
+    Object.keys(views).forEach(function (k) { $(views[k]).classList.toggle('active', k === v); });
+    Array.prototype.forEach.call(document.querySelectorAll('nav button'), function (b) {
+      b.setAttribute('aria-selected', b.getAttribute('data-view') === v ? 'true' : 'false');
+    });
+    if (v === 'console') { var log = $('log'); logStick = true; log.scrollTop = log.scrollHeight; }
+    try { localStorage.setItem('m3bridge.view', v); } catch (e) {}
+    renderBadge();
+  }
+
+  // ===================================================================
+  // Event wiring
+  // ===================================================================
+  $('connectBtn').addEventListener('click', function () {
+    if (state.conn === 'disconnected') reconnect(); else connectClick();
+  });
+  $('hdrBtn').addEventListener('click', disconnect);
+  Array.prototype.forEach.call(document.querySelectorAll('nav button'), function (b) {
+    b.addEventListener('click', function () { showView(b.getAttribute('data-view')); });
+  });
+  $('goCal').addEventListener('click', function () { showView('cal'); });
+
+  $('calStart').addEventListener('click', function () {
+    onCalStarted();
+    send('c');
+  });
+  $('btnCapture').addEventListener('click', function () { send('n'); });
+  $('btnUndo').addEventListener('click', function () { send('u'); });
+  $('autoToggle').addEventListener('click', function () { send('a'); });
+
+  var cancelArmedUntil = 0, cancelTimer = 0;
+  function disarmCancel() {
+    cancelArmedUntil = 0;
+    var b = $('btnCancel');
+    b.classList.remove('armed');
+    b.textContent = 'CANCEL';
+  }
+  $('btnCancel').addEventListener('click', function () {
+    var b = $('btnCancel');
+    if (Date.now() < cancelArmedUntil) {
+      clearTimeout(cancelTimer);
+      disarmCancel();
+      send('x');
+    } else {
+      cancelArmedUntil = Date.now() + 3000;
+      b.classList.add('armed');
+      b.textContent = 'TAP AGAIN TO CANCEL';
+      clearTimeout(cancelTimer);
+      cancelTimer = setTimeout(disarmCancel, 3000);
+    }
+  });
+
+  $('resultCard').addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (t && t.closest && t.closest('[data-dismiss]')) { state.result = null; renderResult(); renderBadge(); }
+  });
+
+  $('rawToggle').addEventListener('click', function () {
+    state.showRaw = !state.showRaw;
+    $('rawToggle').setAttribute('aria-checked', state.showRaw ? 'true' : 'false');
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-cmd]'), function (b) {
+    b.addEventListener('click', function () { send(b.getAttribute('data-cmd')); });
+  });
+  $('clearLog').addEventListener('click', function () { $('log').innerHTML = ''; });
+  $('sendForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var inp = $('sendInput');
+    var v = inp.value;
+    if (!v) { toast('Type one character'); return; }
+    send(v.charAt(0));
+    inp.value = '';
+  });
+
+  // Re-render periodically so stale data is shown as stale.
+  setInterval(function () { if (state.s) render(); }, 500);
+
+  // ===================================================================
+  // Demo simulator (?demo=1). Emits protocol lines as <=20-byte chunks
+  // through the same onBytes() -> handleLine() path as Bluetooth.
+  // ===================================================================
+  function Simulator(startCalibrated) {
+    var encoder = new TextEncoder();
+    var connected = false, stream = false, debug = false, auto = true, calValid = startCalibrated;
+    var cal = 0, step = 0, stab = 0, phase = 'move', phaseT = 0, capT = 0;
+    var t = 0, gear = 7, cad = 0, timer = 0;
+
+    // A plausible calibration path: 25 points, total ~146 µT, smallest step 3.8 µT at gear 6.
+    var PATH = (function () {
+      var pts = [[38.2, -14.6, 22.4]];
+      var dflt = (146.0 - 3.8) / 23;
+      for (var i = 1; i < TOTAL_POINTS; i++) {
+        var d = (i === 5) ? 3.8 : dflt;
+        var a = 0.07 * i, ux = Math.cos(a), uy = Math.sin(a), uz = 0.35;
+        var n = Math.sqrt(ux * ux + uy * uy + uz * uz);
+        var p = pts[i - 1];
+        pts.push([p[0] + d * ux / n, p[1] - d * uy / n, p[2] + d * uz / n]);
+      }
+      return pts;
+    })();
+
+    function out(line) {
+      if (!connected) return;
+      var b = encoder.encode(line + '\r\n');
+      var chunks = [];
+      for (var i = 0; i < b.length; i += 20) chunks.push(b.slice(i, i + 20));
+      setTimeout(function () { chunks.forEach(function (c) { if (connected) onBytes(c); }); }, 0);
+    }
+    function jitter(a) { return (Math.random() * 2 - 1) * a; }
+    function gearToRes(g) { return Math.min(100, 2.5 + (g - 1) * 4.25); }
+
+    function tick() {
+      t++;
+      var res, watts, off, flags = '';
+      var hold = false, sat = false;
+
+      if (cal !== 0) {
+        if (cal === 2) {
+          stab = 100;
+          if (--capT <= 0) capturePoint();
+        } else if (phase === 'move') {
+          stab = 0;
+          if (++phaseT >= 6) { phase = 'settle'; phaseT = 0; }
+        } else if (phase === 'settle') {
+          stab = Math.min(100, stab + 12.5 + jitter(2));
+          if (stab >= 100) { stab = 100; if (auto) beginCapture(); }
+        }
+        cad = phase === 'move' && cal === 1 ? 50 + jitter(5) : Math.max(0, cad * 0.6);
+        var target = step <= 0 ? 1 : step >= 24 ? 24 : step + 1;
+        gear = target;
+        res = gearToRes(target) + (phase === 'move' ? jitter(1.5) : jitter(0.1));
+        watts = Math.round(cad * (0.4 + res * 0.045));
+        off = phase === 'move' ? 3 + Math.random() * 8 : 0.2 + Math.random() * 0.5;
+      } else {
+        if (t % 12 === 0) {
+          gear += Math.random() < 0.5 ? -1 : 1;
+          if (t % 96 === 0) gear += Math.random() < 0.5 ? -4 : 4;
+          gear = Math.max(1, Math.min(24, gear));
+        }
+        cad = 86 + 6 * Math.sin(t / 22) + jitter(1.5);
+        res = gearToRes(gear) + jitter(0.3);
+        watts = Math.round(cad * (0.4 + res * 0.045));
+        hold = (t % 120) >= 100 && (t % 120) < 110;
+        sat = (t % 400) >= 380 && (t % 400) < 386;
+        off = hold ? 6 + Math.random() * 3 : 0.3 + Math.random() * 0.9;
+      }
+      if (calValid) flags += 'V';
+      flags += 'P';
+      if (t > 20) flags += 'Z';
+      if (sat) flags += 'S';
+      if (hold && calValid) flags += 'H';
+      if (auto) flags += 'A';
+
+      if (stream) {
+        out(['S', calValid ? gear : 0, res.toFixed(1), Math.max(0, watts), cad.toFixed(1),
+          cal, cal ? step : 0, Math.round(stab), off.toFixed(1), flags].join(','));
+      }
+      if (debug && t % 4 === 0) {
+        var p = PATH[Math.max(0, Math.min(24, gear - 1))];
+        out('dbg B=(' + (p[0] + jitter(.3)).toFixed(1) + ', ' + (p[1] + jitter(.3)).toFixed(1) + ', ' +
+          (p[2] + jitter(.3)).toFixed(1) + ') µT  off=' + off.toFixed(1) + ' µT  gear=' + (calValid ? gear : 0));
+      }
+    }
+
+    function beginCapture() { cal = 2; capT = 2; }
+
+    function capturePoint() {
+      var p = PATH[step];
+      out(['C', step + 1, (p[0] + jitter(0.05)).toFixed(1), (p[1] + jitter(0.05)).toFixed(1), (p[2] + jitter(0.05)).toFixed(1)].join(','));
+      out('Point ' + (step + 1) + ' captured.');
+      step++;
+      if (step >= TOTAL_POINTS) {
+        cal = 0; step = 0; stab = 0; calValid = true;
+        out('Calibration complete: 25 points, span 146.0 µT, smallest step 3.8 µT at gear 6.');
+        out('K,1,146.0,3.8,6,saved');
+        return;
+      }
+      cal = 1; stab = 0; phase = 'move'; phaseT = 0;
+    }
+
+    this.receive = function (c) {
+      if (!connected) return;
+      switch (c) {
+        case '1': stream = true; break;
+        case '0': stream = false; out('Status stream off.'); break;
+        case 'c':
+          if (cal !== 0) { out('Already calibrating. x = abort.'); break; }
+          cal = 1; step = 0; stab = 0; phase = 'move'; phaseT = 0;
+          out('Calibration started: 25 points. Auto-capture is ' + (auto ? 'ON' : 'OFF') + '.');
+          break;
+        case 'n':
+          if (cal === 0) { out('Not calibrating. c = start.'); break; }
+          if (cal === 1) { beginCapture(); out('Capturing point ' + (step + 1) + '...'); }
+          break;
+        case 'u':
+          if (cal === 0) { out('Not calibrating.'); break; }
+          if (step === 0) { out('Nothing to undo.'); break; }
+          step--; cal = 1; stab = 0; phase = 'move'; phaseT = 0;
+          out('U,' + step);
+          out('Undo: back to point ' + (step + 1) + '.');
+          break;
+        case 'x':
+          if (cal === 0) { out('Not calibrating.'); break; }
+          cal = 0; step = 0; stab = 0;
+          out('A,cancelled by user');
+          break;
+        case 'a':
+          auto = !auto;
+          out('Auto-capture ' + (auto ? 'ON' : 'OFF') + '.');
+          if (auto && cal === 1 && stab >= 100) beginCapture();
+          break;
+        case 'p':
+          if (!calValid) { out('No valid calibration stored.'); break; }
+          out('Calibration (point, x, y, z in µT):');
+          PATH.forEach(function (p, i) {
+            out('  ' + (i < 9 ? ' ' : '') + (i + 1) + '  (' + p[0].toFixed(1) + ', ' + p[1].toFixed(1) + ', ' + p[2].toFixed(1) + ')');
+          });
+          out('  span = 146.0 µT, smallest step = 3.8 µT at gear 6');
+          break;
+        case 'h': case '?':
+          out('Commands: 1/0=status stream on/off  c=calibrate  n=capture point');
+          out('          u=undo point  x=abort  a=auto-capture on/off');
+          out('          d=debug stream on/off  p=show calibration  h=help');
+          break;
+        case 'd': debug = !debug; out('Debug stream ' + (debug ? 'ON' : 'OFF') + '.'); break;
+        default: out("Unknown command '" + c + "'. h = help.");
+      }
+    };
+
+    this.connect = function () {
+      connected = true; stream = false; debug = false;
+      clearInterval(timer);
+      timer = setInterval(tick, 250);
+      out('');
+      out('Keiser M3 Bridge - phone console connected.');
+      out('Simulated firmware. Type h for help.');
+    };
+    this.disconnect = function () {
+      connected = false; stream = false; debug = false;
+      clearInterval(timer);
+    };
+  }
+
+  var sim = null;
+  function demoConnect() {
+    if (!sim) sim = new Simulator(!DEMO_UNCAL);
+    setConn('connecting', 'Starting simulator...');
+    setTimeout(function () {
+      resetRx();
+      sim.connect();
+      writeChain = Promise.resolve();
+      setConn('connected');
+      send('1', true);
+    }, 400);
+  }
+
+  // ===================================================================
+  // Boot
+  // ===================================================================
+  var startView = 'ride';
+  try { startView = localStorage.getItem('m3bridge.view') || 'ride'; } catch (e) {}
+  showView(startView);
+  renderPoints();
+  renderResult();
+  if (DEMO) {
+    setConn('idle');
+    logLine('Demo mode: no Bluetooth. Add &uncal=1 to the URL to start uncalibrated.', 'sys');
+  } else if (!navigator.bluetooth) {
+    setConn('unsupported');
+  } else {
+    setConn('idle');
+  }
+
+  // Expose a tiny hook for debugging in a desktop console.
+  window.M3Bridge = { state: state, handleLine: handleLine, send: send };
+})();
+</script>
+</body>
+</html>
