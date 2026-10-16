@@ -176,6 +176,8 @@ main {
 .tile .v { font-size: clamp(1.9rem, 9.5vw, 3.2rem); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.05; overflow: hidden; text-overflow: clip; white-space: nowrap; }
 .tile .u { font-size: .85rem; font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
 .stale .v, .stale.gear { opacity: .35; }
+.tile .src { font-size: .78rem; font-weight: 600; color: var(--muted); margin-top: 2px; line-height: 1.15; }
+.tile .src.off { color: var(--warn); }
 
 /* ---------- calibrate ---------- */
 .switch-row {
@@ -266,8 +268,8 @@ ol.steps li { margin: 4px 0; }
 .log .bad { color: var(--bad); }
 .log .sent { color: var(--accent); }
 .log .sys { color: var(--warn); }
-.qbtns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.qbtns .btn { padding: 6px 4px; font-size: .95rem; flex-direction: column; gap: 0; }
+.qbtns { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.qbtns .btn { padding: 6px 2px; font-size: .88rem; line-height: 1.15; flex-direction: column; gap: 0; }
 .qbtns .btn .k { font-family: var(--mono); font-size: .8rem; color: var(--muted); font-weight: 600; }
 .sendrow { display: flex; gap: 8px; }
 .sendrow input {
@@ -397,7 +399,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     </div>
     <div class="tiles" id="tiles">
       <div class="tile"><div class="v" id="watts">--</div><div class="u">Watts</div></div>
-      <div class="tile"><div class="v" id="cad">--</div><div class="u">RPM</div></div>
+      <div class="tile"><div class="v" id="cad">--</div><div class="u">RPM</div><div class="src" id="cadSrc" hidden></div></div>
       <div class="tile"><div class="v" id="res">--</div><div class="u">Resist %</div></div>
     </div>
   </section>
@@ -409,13 +411,25 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     <div id="calIdle">
       <div class="card">
         <h2>Calibrate gears</h2>
-        <p class="muted">You will record 25 lever positions. Hold the lever still at each one.</p>
-        <ol class="steps muted small">
-          <li>Point 1: gear lever all the way down.</li>
-          <li>Points 2 to 24: move the lever up until the console first shows the next gear, then stop pedalling.</li>
-          <li>Point 25: gear lever all the way up.</li>
-        </ol>
-        <p class="muted small">With auto-capture on, each point is taken once the reading has held steady for about 2 seconds. Otherwise tap CAPTURE.</p>
+        <div id="calIntroV2">
+          <p class="muted">You will record 25 lever positions. Hold the lever still at each one.</p>
+          <ol class="steps muted small">
+            <li>Point 1: gear lever all the way down.</li>
+            <li>Points 2 to 24: move the lever up until the console first shows the next gear, then stop pedalling.</li>
+            <li>Point 25: gear lever all the way up.</li>
+          </ol>
+          <p class="muted small">With auto-capture on, each point is taken once the reading has held steady for about 2 seconds. Otherwise tap CAPTURE.</p>
+        </div>
+        <div id="calIntroV3" hidden>
+          <p class="muted">Calibration is done <b>while pedalling</b>. Keep pedalling the whole time; the console shows the gear while you pedal.</p>
+          <ol class="steps muted small">
+            <li>First the bridge learns your crank: pedal steadily for about 10 seconds. It beeps twice quickly when done.</li>
+            <li>Point 1: gear lever all the way down.</li>
+            <li>Points 2 to 24: move the lever up until the console first shows the next gear, then hold it there.</li>
+            <li>Point 25: gear lever all the way up.</li>
+          </ol>
+          <p class="muted small">With auto-capture on, each point is taken once 3 pedal turns in a row agree. Otherwise tap CAPTURE.</p>
+        </div>
         <button class="btn primary big" id="calStart" type="button" style="margin-top:12px">Start calibration</button>
         <button class="btn secondary" id="saveStored" type="button" style="margin-top:10px; width:100%">Save stored calibration</button>
         <p class="small muted" style="margin:8px 0 0">Every finished calibration is saved on this phone automatically. <button class="linkbtn" type="button" id="goSaved">See saved runs</button></p>
@@ -512,15 +526,17 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
 
   <!-- CONSOLE -->
   <section class="view" id="view-console" aria-label="Console">
+    <div class="small muted" id="turnInfo" hidden></div>
     <div class="log" id="log" role="log" aria-live="off"></div>
     <button class="switch-row" id="rawToggle" type="button" role="switch" aria-checked="false">
-      <span><span class="t">Show machine lines</span><br><span class="s">S, C, K, A, U, Q, G, M, Y lines; first 10 D lines per transfer</span></span>
+      <span><span class="t">Show machine lines</span><br><span class="s">S, C, K, A, U, Q, G, M, Y lines, plus the first 10 D and T lines</span></span>
       <span class="switch" aria-hidden="true"></span>
     </button>
     <div class="qbtns">
       <button class="btn" type="button" data-cmd="h">Help<span class="k">h</span></button>
       <button class="btn" type="button" data-cmd="p">Print cal<span class="k">p</span></button>
       <button class="btn" type="button" data-cmd="d">Debug<span class="k">d</span></button>
+      <button class="btn" type="button" data-cmd="t">Turns<span class="k">t</span></button>
       <button class="btn" type="button" id="clearLog">Clear<span class="k">log</span></button>
     </div>
     <form class="sendrow" id="sendForm" autocomplete="off">
@@ -572,6 +588,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   var DEMO_DROP = params.get('drop') === '1';       // demo: drop one D line in the first transfer
   var DEMO_OLDFW = params.get('oldfw') === '1';     // demo: act like firmware without k/g/m/e/y
   var FAST = params.get('fast') === '1' ? 5 : 1;    // divide diagnostic step times by 5
+  var DEMO_V3 = params.get('v3') === '1';           // demo: simulate firmware v3 (calibration while pedalling)
 
   var DIAG_STEPS = [
     { label: 'Hands off — lever down', text: "Push the lever all the way down. Don't touch the bike.", secs: 8 },
@@ -581,13 +598,15 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     { label: 'Hold at bottom', text: 'Leave the lever all the way down.', secs: 5 },
     { label: 'Slow crank turn', text: 'Lever down. Turn the crank slowly by hand through one full revolution, pausing at each quarter.', secs: 20 },
     { label: 'Set middle gear', text: 'Pedal and set the lever so the console shows about gear 10–12.', secs: 15 },
-    { label: 'Pedal easy', text: 'Pedal easy and steady, about 60 rpm.', secs: 20 },
-    { label: 'Pedal fast', text: 'Pedal fast, 90–100 rpm.', secs: 20 },
+    { label: 'Pedal easy', text: 'Pedal easy and steady, about 60 rpm. Count your turns out loud (e.g. 20) and tell Claude the number.', secs: 20 },
+    { label: 'Pedal fast', text: 'Pedal fast, 90–100 rpm. Count your turns out loud and tell Claude the number.', secs: 20 },
     { label: 'Stop', text: 'Stop pedalling. Sit still on the saddle.', secs: 15 },
     { label: 'Lean', text: 'Lean forward onto the bars 5 s, sit up 5 s, lean back 5 s.', secs: 15, optional: true }
   ];
   var MAX_MARKERS = 32;
   var D_RAW_SHOWN = 10;
+  var T_RAW_SHOWN = 10;
+  var CAL3_PROMPT = 'Pedal steadily for about 10 seconds so the bridge can learn your crank';
 
   function $(id) { return document.getElementById(id); }
 
@@ -603,7 +622,10 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     result: null,        // {type:'K', ok, span, minstep, minAt, msg, recordId} | {type:'A', reason}
     showRaw: false,
     view: 'ride',
-    q: null              // collecting Q lines: {points:[], timer}
+    q: null,             // collecting Q lines: {points:[], crank, timer}
+    v3: false,           // [v3] S lines carry src
+    lastTurn: null,      // last T line
+    tShown: 0            // T lines logged since Turns was last toggled
   };
 
   // Diagnostic run state
@@ -697,6 +719,18 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     }
     line = line.replace(/[\r\0]/g, '').replace(/\s+$/, '');
     if (!line.trim()) return;
+    // [v3] T lines: one per pedal turn; logged only with "Show machine lines", capped.
+    if (line.charCodeAt(0) === 84 && line.charCodeAt(1) === 44) {
+      var tok = false;
+      try { tok = onT(line.split(',')); } catch (e) { tok = false; }
+      if (!tok) logLine(line + '   (malformed, ignored)', 'rawbad');
+      else if (state.showRaw && state.tShown < T_RAW_SHOWN) {
+        state.tShown++;
+        logLine(line, 'raw');
+        if (state.tShown === T_RAW_SHOWN) logLine('(further T lines not shown until Turns is switched again)', 'raw');
+      }
+      return;
+    }
     var m = MACHINE_RE.exec(line);
     if (!m) { logLine(line, 'human'); return; }
     var parts = line.split(',');
@@ -722,7 +756,11 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     if (p.length < 9) return false;
     var gear = int(p[1]), cal = int(p[5]);
     if (!fin(gear) || gear < 0 || gear > 99) return false;
-    if (!fin(cal) || cal < 0 || cal > 2) return false;
+    if (!fin(cal) || cal < 0 || cal > 3) return false;
+    // [v3] 12th field src: B board / W pod / - none. Its presence marks v3 firmware.
+    var srcRaw = p.length >= 12 ? p[11].trim() : '';
+    var src = srcRaw === 'B' || srcRaw === 'W' || srcRaw === '-' ? srcRaw : '';
+    if (cal === 3 && !src) return false;   // cal=3 only exists on v3
     var flagStr = (p[9] || '').trim();
     var flags = {};
     for (var i = 0; i < flagStr.length; i++) flags[flagStr.charAt(i)] = true;
@@ -739,12 +777,19 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       off: num(p[8]),
       flags: flags,
       flagStr: flagStr,
-      rec: int(p[10])      // optional 11th field: samples recorded so far
+      rec: int(p[10]),     // optional 11th field: samples recorded so far
+      src: src,            // [v3] '' on v2
+      pedalling: src ? (src !== '-' && !!flags.R) : true
     };
     var prevCal = state.s ? state.s.cal : 0;
     state.s = s;
     state.sAt = Date.now();
+    state.v3 = !!src;
     if (prevCal === 0 && cal !== 0) onCalStarted();
+    if (prevCal === 3 && (cal === 1 || cal === 2)) {
+      toast('Crank learned. Start the 25 points.');
+      try { if (navigator.vibrate) navigator.vibrate([60, 60, 60]); } catch (e) {}
+    }
     render();
     return true;
   }
@@ -843,9 +888,17 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       if (q) clearTimeout(q.timer);
       state.q = null;
       if (!q || !q.points.length) return true; // stray end without points
-      var info = { ok: true, span: num(p[2]), minstep: num(p[3]), minAt: int(p[4]), msg: 'stored' };
+      var info = { ok: true, span: num(p[2]), minstep: num(p[3]), minAt: int(p[4]), msg: 'stored', crank: q.crank || null };
       saveCalRecord('stored', info, q.points);
       toast('Stored calibration saved');
+      return true;
+    }
+    if (kind === 'crank') {
+      // [v3] Q,crank,<ux>,<uy>,<uz>,<depth>,<sign>
+      var crank = { ux: num(p[2]), uy: num(p[3]), uz: num(p[4]), depth: num(p[5]), sign: int(p[6]) };
+      if (!fin(crank.ux) || !fin(crank.uy) || !fin(crank.uz)) return false;
+      if (!state.q) state.q = { points: [], timer: 0 };
+      state.q.crank = crank;
       return true;
     }
     var point = int(kind);
@@ -856,6 +909,26 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     state.q.points = state.q.points.filter(function (x) { return x.point !== point; });
     state.q.points.push({ point: point, x: num(p[2]), y: num(p[3]), z: num(p[4]) });
     return true;
+  }
+
+  // ===================================================================
+  // [v3] T,<ms>,<period_ms>,<x>,<y>,<z>,<gear>,<res>: one pedal turn
+  // ===================================================================
+  function onT(p) {
+    if (p.length < 3) return false;
+    var period = num(p[2]);
+    if (!fin(period) || period < 0) return false;
+    state.lastTurn = { ms: num(p[1]), period: period, x: num(p[3]), y: num(p[4]), z: num(p[5]), gear: int(p[6]), res: num(p[7]) };
+    renderTurnInfo();
+    return true;
+  }
+  function renderTurnInfo() {
+    var t = state.lastTurn, el = $('turnInfo');
+    if (!t) { el.hidden = true; return; }
+    el.hidden = false;
+    var rpm = t.period > 0 ? 60000 / t.period : NaN;
+    el.textContent = 'Last turn: ' + Math.round(t.period) + ' ms · ' + fmt(rpm, 1) + ' rpm' +
+      (t.gear > 0 ? ' · gear ' + t.gear : '') + (fin(t.res) ? ' · res ' + fmt(t.res, 1) : '');
   }
 
   // ===================================================================
@@ -1279,9 +1352,11 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       '# minstep_at_gear: ' + (fin(info.minAt) ? info.minAt : ''),
       '# message: ' + ascii(info.msg || ''),
       '# points: ' + pts.length + ' of ' + TOTAL_POINTS,
+      (info.crank ? '# crank: ux=' + fmt(info.crank.ux, 3) + ', uy=' + fmt(info.crank.uy, 3) + ', uz=' + fmt(info.crank.uz, 3) +
+        ', depth_uT=' + fmt(info.crank.depth, 1) + ', sign=' + (fin(info.crank.sign) ? info.crank.sign : '') : null),
       '# labels: point 1 = lever all the way down (Bottom); points 2-24 = where the console first shows that gear; point 25 = lever all the way up (Top)',
       'point,label,x_uT,y_uT,z_uT,dist_prev_uT'
-    ];
+    ].filter(function (l) { return l !== null; });
     for (var i = 0; i < pts.length; i++) {
       var p = pts[i];
       var prev = i > 0 && pts[i - 1].point === p.point - 1 ? pts[i - 1] : null;
@@ -1609,6 +1684,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       var code = c.charCodeAt(0);
       if (code < 32 || code > 126) return;
       if (!quiet) logLine('> ' + c, 'sent');
+      if (c === 't') state.tShown = 0;   // T-line logging cap restarts each time Turns is toggled
       writeChain = writeChain
         .then(function () { return writeChar(c); })
         .catch(function (err) {
@@ -1843,6 +1919,11 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     $('watts').textContent = fin(s.watts) ? String(s.watts) : '--';
     $('cad').textContent = fmt(s.cad, 0);
     $('res').textContent = fmt(s.res, 0);
+    // [v3] cadence source under the cadence
+    var cs = $('cadSrc');
+    cs.hidden = !s.src;
+    cs.className = 'src' + (s.src && !s.pedalling ? ' off' : '');
+    cs.textContent = !s.src ? '' : !s.pedalling ? 'not pedalling' : s.src === 'B' ? 'from crank magnet' : 'from Wahoo pod';
 
     var calibrated = s.gear > 0 && !!s.flags.V;
     if (transferActive()) {
@@ -1870,6 +1951,10 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     if (s.flags.S) {
       note.textContent = 'Magnetometer saturated';
       note.classList.add('bad');
+    } else if (s.src && !s.pedalling && s.cal === 0) {
+      // [v3] gear comes from whole pedal turns, so it only updates while pedalling
+      gearEl.classList.add('dim');
+      note.textContent = 'Not pedalling — showing the last gear';
     } else if (s.flags.H) {
       gearEl.classList.add('hold');
       note.textContent = 'Holding last good gear (off ' + fmt(s.off, 1) + ' µT)';
@@ -1881,7 +1966,12 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     }
   }
 
-  function promptHtml(step) {
+  function promptHtml(step, v3) {
+    if (v3) {
+      if (step <= 0) return 'Keep pedalling. Push the gear lever ALL THE WAY DOWN';
+      if (step >= 24) return 'Keep pedalling. Push the gear lever ALL THE WAY UP';
+      return 'Keep pedalling. Move the lever up until the console FIRST shows gear <b>' + (step + 1) + '</b>, then hold it there';
+    }
     if (step <= 0) return 'Push the gear lever ALL THE WAY DOWN';
     if (step >= 24) return 'Push the gear lever ALL THE WAY UP';
     return 'Move the lever up until the console FIRST shows gear <b>' + (step + 1) + '</b>, then stop pedalling';
@@ -1897,12 +1987,15 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     $('calActive').hidden = !active;
     $('calStart').disabled = !connected || !s;
     $('calStart').textContent = connected ? 'Start calibration' : 'Connect first';
+    var v3 = !!(s && s.src);
+    $('calIntroV2').hidden = v3;
+    $('calIntroV3').hidden = !v3;
 
     // auto-capture toggle reflects the A flag
     var at = $('autoToggle');
     if (s) {
       at.setAttribute('aria-checked', s.flags.A ? 'true' : 'false');
-      $('autoSub').textContent = s.flags.A ? 'On: captures after ~2 s held steady' : 'Off: tap CAPTURE for each point';
+      $('autoSub').textContent = s.flags.A ? (v3 ? 'On: captures after 3 agreeing pedal turns' : 'On: captures after ~2 s held steady') : 'Off: tap CAPTURE for each point';
     } else {
       at.setAttribute('aria-checked', 'mixed');
       $('autoSub').textContent = connected ? 'Waiting for status' : 'Not connected';
@@ -1914,38 +2007,58 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     if (!active) { lastStepRendered = -1; return; }
 
     var step = s.step;
-    $('calPoint').textContent = 'Point ' + (step + 1) + ' of ' + TOTAL_POINTS;
-    $('calCount').textContent = step + ' captured';
-    if (step !== lastStepRendered) {
-      $('calPrompt').innerHTML = promptHtml(step);
-      lastStepRendered = step;
+    var learning = s.cal === 3;
+    $('calPoint').textContent = learning ? 'Learning your crank' : 'Point ' + (step + 1) + ' of ' + TOTAL_POINTS;
+    $('calCount').textContent = learning ? 'stage 1 of 2' : step + ' captured';
+    // prompt key: changes with step, v3 and the learning stage
+    var pkey = (learning ? 'L' : step) + (v3 ? 'v3' : 'v2');
+    if (pkey !== lastStepRendered) {
+      $('calPrompt').innerHTML = learning
+        ? '<div style="font-size:1.7rem">Learning your crank — pedal steadily</div><div class="small" style="font-weight:600;margin-top:6px;line-height:1.35">' + CAL3_PROMPT + '</div>'
+        : promptHtml(step, v3);
+      lastStepRendered = pkey;
     }
+    if (learning) step = 0;
     var segs = $('segs');
     if (segs.children.length !== TOTAL_POINTS) {
       segs.innerHTML = '';
       for (var i = 0; i < TOTAL_POINTS; i++) { var d = document.createElement('div'); d.className = 'seg'; segs.appendChild(d); }
     }
     for (var j = 0; j < TOTAL_POINTS; j++) {
-      segs.children[j].className = 'seg' + (j < step ? ' done' : (j === step ? ' cur' : ''));
+      segs.children[j].className = 'seg' + (j < step ? ' done' : (j === step && !learning ? ' cur' : ''));
     }
 
     var stab = Math.round(s.stab);
     var ring = $('ring');
     $('ringFill').setAttribute('stroke-dashoffset', String(RING_C * (1 - stab / 100)));
-    $('ringPct').textContent = String(stab);
     ring.classList.toggle('full', stab >= 100 && s.cal !== 2);
     ring.classList.toggle('cap', s.cal === 2);
-    var title, sub;
-    if (s.cal === 2) { title = 'Capturing...'; sub = 'Averaging. Keep the lever still.'; }
+    var title, sub, pct = String(stab);
+    if (learning) {
+      title = 'Learning your crank';
+      sub = s.pedalling ? 'Pedal steadily. About 10 seconds.' : 'Start pedalling steadily.';
+    } else if (v3) {
+      // [v3] stab = agreeing pedal turns: 0/33/67/100 -> 0..3
+      var turns = Math.max(0, Math.min(3, Math.round(stab / 100 * 3)));
+      pct = turns + '/3';
+      if (s.cal === 2) { title = 'Capturing...'; sub = 'Keep pedalling, keep the lever still.'; }
+      else if (!s.pedalling) { title = 'Keep pedalling'; sub = 'Turns are only counted while you pedal.'; }
+      else {
+        title = 'Turns agreeing: ' + turns + ' of 3';
+        sub = turns >= 3 ? (s.flags.A ? 'About to capture.' : 'Tap CAPTURE to record this point.')
+          : (s.flags.A ? 'Auto-capture at 3 of 3. Hold the lever still.' : 'Tap CAPTURE when ready.');
+      }
+    } else if (s.cal === 2) { title = 'Capturing...'; sub = 'Averaging. Keep the lever still.'; }
     else if (stab >= 100 && !s.flags.A) { title = 'Steady'; sub = 'Tap CAPTURE to record this point.'; }
     else if (stab >= 100) { title = 'Steady'; sub = 'About to capture.'; }
     else if (stab > 0) { title = 'Hold steady'; sub = s.flags.A ? 'Auto-capture when the ring fills.' : 'Tap CAPTURE when ready.'; }
     else { title = 'Set the lever'; sub = 'Then stop moving it.'; }
+    $('ringPct').textContent = pct;
     $('meterTitle').textContent = title;
     $('meterSub').textContent = sub;
 
-    $('btnCapture').disabled = !connected || s.cal === 2;
-    $('btnUndo').disabled = !connected || step === 0;
+    $('btnCapture').disabled = !connected || s.cal === 2 || learning;
+    $('btnUndo').disabled = !connected || step === 0 || learning;
     $('btnCancel').disabled = !connected;
   }
 
@@ -2186,6 +2299,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     var connected = false, stream = false, debug = false, auto = true, calValid = startCalibrated;
     var cal = 0, step = 0, stab = 0, phase = 'move', phaseT = 0, capT = 0;
     var t = 0, gear = 7, cad = 0, timer = 0;
+    // [v3] turn detection from the crank magnet
+    var turnAcc = 0, turnMs = 0, agree = 0, tStream = false, pedal = true;
 
     // A plausible calibration path: 25 points, total ~146 µT, smallest step 3.8 µT at gear 6.
     var PATH = (function () {
@@ -2315,7 +2430,39 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       var res, watts, off, flags = '';
       var hold = false, sat = false;
 
-      if (cal !== 0) {
+      if (DEMO_V3 && cal !== 0) {
+        // [v3] calibration while pedalling: learn the crank (cal=3), then 3 agreeing turns per point
+        pedal = true;
+        cad = 75 + jitter(2);
+        if (cal === 3) {
+          stab = Math.min(100, stab + 2.5 + jitter(0.4));   // ~10 s
+          if (stab >= 100) {
+            cal = 1; step = 0; stab = 0; agree = 0; phase = 'move'; phaseT = 0;
+            out('Crank learned: dip depth 4.8 uT. Start the 25 points.');
+          }
+        } else if (cal === 2) {
+          if (--capT <= 0) capturePoint();
+        } else if (phase === 'move') {
+          stab = 0; agree = 0;
+          if (++phaseT >= 6) { phase = 'settle'; phaseT = 0; }
+        }
+        var tgt = step <= 0 ? 1 : step >= 24 ? 24 : step + 1;
+        if (cal !== 3) gear = tgt;
+        res = gearToRes(gear) + (phase === 'move' && cal === 1 ? jitter(1.5) : jitter(0.1));
+        watts = Math.round(cad * (0.4 + res * 0.045));
+        off = phase === 'move' && cal === 1 ? 3 + Math.random() * 8 : 0.2 + Math.random() * 0.5;
+      } else if (DEMO_V3) {
+        // [v3] riding, with a short stop every ~40 s
+        pedal = (t % 160) < 136;
+        if (t % 12 === 0 && pedal) {
+          gear += Math.random() < 0.5 ? -1 : 1;
+          gear = Math.max(1, Math.min(24, gear));
+        }
+        cad = pedal ? 78 + 5 * Math.sin(t / 22) + jitter(1.5) : 0;
+        res = gearToRes(gear) + jitter(0.3);
+        watts = pedal ? Math.round(cad * (0.4 + res * 0.045)) : 0;
+        off = 0.3 + Math.random() * 0.9;
+      } else if (cal !== 0) {
         if (cal === 2) {
           stab = 100;
           if (--capT <= 0) capturePoint();
@@ -2345,8 +2492,13 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
         sat = (t % 400) >= 380 && (t % 400) < 386;
         off = hold ? 6 + Math.random() * 3 : 0.3 + Math.random() * 0.9;
       }
+      if (DEMO_V3 && pedal && cad > 0) {
+        turnAcc += cad / 60 * 0.25;
+        while (turnAcc >= 1) { turnAcc -= 1; onTurn(Math.round(60000 / cad)); }
+      }
       if (calValid) flags += 'V';
-      flags += 'P';
+      if (!DEMO_V3) flags += 'P';   // v3 demo: no pod, cadence from the crank magnet
+      if (DEMO_V3 && pedal) flags += 'R';
       if (t > 20) flags += 'Z';
       if (sat) flags += 'S';
       if (hold && calValid) flags += 'H';
@@ -2356,7 +2508,8 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
 
       if (stream && !dumping) {   // status lines pause during a transfer
         out(['S', calValid ? gear : 0, res.toFixed(1), Math.max(0, watts), cad.toFixed(1),
-          cal, cal ? step : 0, Math.round(stab), off.toFixed(1), flags, samples.length].join(','));
+          cal, cal ? step : 0, Math.round(stab), off.toFixed(1), flags, samples.length]
+          .concat(DEMO_V3 ? [pedal ? 'B' : '-'] : []).join(','));
       }
       if (debug && t % 4 === 0) {
         var p = PATH[Math.max(0, Math.min(24, gear - 1))];
@@ -2366,6 +2519,21 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
     }
 
     function beginCapture() { cal = 2; capT = 2; }
+
+    // [v3] one detected pedal turn
+    function onTurn(period) {
+      turnMs += period;
+      if (tStream) {
+        var p = PATH[Math.max(0, Math.min(24, gear - 1))];
+        out(['T', turnMs, period, (p[0] + jitter(0.2)).toFixed(1), (p[1] + jitter(0.2)).toFixed(1), (p[2] + jitter(0.2)).toFixed(1),
+          calValid ? gear : 0, gearToRes(gear).toFixed(1)].join(','));
+      }
+      if (cal === 1 && phase === 'settle') {
+        agree = Math.min(3, agree + 1);
+        stab = [0, 33, 67, 100][agree];
+        if (agree >= 3 && auto) beginCapture();
+      }
+    }
 
     function capturePoint() {
       var p = PATH[step];
@@ -2389,17 +2557,23 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
         case '0': stream = false; out('Status stream off.'); break;
         case 'c':
           if (cal !== 0) { out('Already calibrating. x = abort.'); break; }
+          if (DEMO_V3) {
+            cal = 3; step = 0; stab = 0; agree = 0;
+            out('Calibration started. Pedal steadily so the bridge can learn your crank.');
+            break;
+          }
           cal = 1; step = 0; stab = 0; phase = 'move'; phaseT = 0;
           out('Calibration started: 25 points. Auto-capture is ' + (auto ? 'ON' : 'OFF') + '.');
           break;
         case 'n':
           if (cal === 0) { out('Not calibrating. c = start.'); break; }
+          if (cal === 3) { out('Still learning the crank. Keep pedalling.'); break; }
           if (cal === 1) { beginCapture(); out('Capturing point ' + (step + 1) + '...'); }
           break;
         case 'u':
           if (cal === 0) { out('Not calibrating.'); break; }
           if (step === 0) { out('Nothing to undo.'); break; }
-          step--; cal = 1; stab = 0; phase = 'move'; phaseT = 0;
+          step--; cal = 1; stab = 0; agree = 0; phase = 'move'; phaseT = 0;
           out('U,' + step);
           out('Undo: back to point ' + (step + 1) + '.');
           break;
@@ -2426,6 +2600,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
           PATH.forEach(function (p, i) {
             out('Q,' + (i + 1) + ',' + p[0].toFixed(1) + ',' + p[1].toFixed(1) + ',' + p[2].toFixed(1));
           });
+          if (DEMO_V3) out('Q,crank,0.612,-0.354,0.707,4.8,-1');
           out('Q,end,146.0,3.8,6');
           break;
         case 'g':
@@ -2456,7 +2631,12 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
           out('          u=undo point  x=abort  a=auto-capture on/off');
           out('          p=show calibration  k=calibration as Q lines');
           out('          g=start recording  m=marker  e=stop  y=send recording');
-          out('          d=debug stream on/off  h=help');
+          out('          d=debug stream on/off  h=help' + (DEMO_V3 ? '  t=turn stream on/off' : ''));
+          break;
+        case 't':
+          if (!DEMO_V3) { out("Unknown command 't'. h = help."); break; }
+          tStream = !tStream;
+          out('Turn stream ' + (tStream ? 'ON' : 'OFF') + '.');
           break;
         case 'd': debug = !debug; out('Debug stream ' + (debug ? 'ON' : 'OFF') + '.'); break;
         default: out("Unknown command '" + c + "'. h = help.");
@@ -2469,7 +2649,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
       timer = setInterval(tick, 250);
       out('');
       out('Keiser M3 Bridge - phone console connected.');
-      out('Simulated firmware. Type h for help.');
+      out('Simulated firmware ' + (DEMO_V3 ? 'v3 (calibration while pedalling)' : 'v2') + '. Type h for help.');
     };
     this.disconnect = function () {
       connected = false; stream = false; debug = false;
@@ -2505,7 +2685,7 @@ nav button .badge { display: inline-block; width: 9px; height: 9px; border-radiu
   renderDiag();
   if (DEMO) {
     setConn('idle');
-    logLine('Demo mode: no Bluetooth. URL options: &uncal=1 start uncalibrated, &fast=1 short diagnostic steps, &drop=1 lose one line in the first recording transfer.', 'sys');
+    logLine('Demo mode: no Bluetooth. URL options: &v3=1 firmware v3 (calibrate while pedalling), &uncal=1 start uncalibrated, &fast=1 short diagnostic steps, &drop=1 lose one line in the first recording transfer.', 'sys');
   } else if (!navigator.bluetooth) {
     setConn('unsupported');
   } else {

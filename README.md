@@ -32,11 +32,17 @@ Web Bluetooth only works on secure pages: `https://`, or `http://localhost` on a
 
    With **Auto-capture** on, each point is taken once the ring fills (about 2 seconds held steady). Turn it off to use **CAPTURE** yourself. **UNDO** goes back one point. **CANCEL** needs a second tap to confirm.
    At the end you get a result card with the path span and the smallest step between gears. A smallest step under 1.5 µT is flagged as marginal.
+   **Firmware v3: calibrate while pedalling.** v3 works out the gear from each full pedal turn (it sees the crank magnet), so calibration is done while you pedal and the Calibrate tab changes to match (the page detects v3 by itself):
+   - First the bridge learns your crank: pedal steadily for about 10 seconds while the ring fills. The board gives **two quick high beeps** when it is done, and the page shows "Crank learned".
+   - Then the same 25 points, but **keep pedalling throughout**: move the lever until the console first shows the next gear, then hold it there. The console keeps showing the gear while you pedal.
+   - The meter shows "Turns agreeing: n of 3". With auto-capture on, the point is taken at 3 of 3.
+   - On the Ride tab the cadence shows where it comes from (crank magnet or Wahoo pod). When you stop pedalling it says "Not pedalling" and dims the gear, because the gear only updates on whole turns. Watts at 0 is normal then.
+
    Every finished calibration (saved or rejected) is saved on the phone automatically. **Save stored calibration** reads the calibration currently stored on the bridge and saves it the same way.
 4. **Diagnose** tab: a guided recording of the raw magnetometer field, for troubleshooting. Tap **Start diagnostic run** and follow the cards. Each step has a countdown and moves on by itself; **NEXT** skips ahead and **BACK** repeats the previous step. The 11 steps cover the lever held down, a slow sweep up, a hold at the top, a sweep down, a hold at the bottom, one slow crank revolution by hand, setting a middle gear, easy and fast pedalling, stopping, and an optional lean step (switch it off before starting). The whole run is about 2.5 minutes; the bridge can hold 8 minutes.
    When the run ends, the page downloads the recording, checks the sample count and checksum, and saves it. If anything was lost on the way, it says "Transfer incomplete"; tap **Retry**, because the bridge still has the recording. **CANCEL** needs a second tap and discards the run.
    Diagnostics need the bridge running **firmware v2 with recording** (`g`/`m`/`e`/`y`). With older firmware the page says so and does nothing else.
-5. **Console** tab: shows the bridge's text lines. Quick buttons send `h` (help), `p` (print calibration) and `d` (debug stream, chatty). The text box sends any single character. "Show machine lines" also shows the raw machine lines (only the first 10 `D` lines of each recording transfer).
+5. **Console** tab: shows the bridge's text lines. Quick buttons send `h` (help), `p` (print calibration), `d` (debug stream, chatty) and, on v3 firmware, `t` (**Turns**: one line per pedal turn; the time of the last turn and its rpm appear above the log). The text box sends any single character. "Show machine lines" also shows the raw machine lines (only the first 10 `D` lines of each recording transfer).
 
 If the connection drops, tap **Reconnect**. If it drops during a diagnostic run, reconnect and tap **Download recording**.
 
@@ -51,7 +57,7 @@ Calibrations and diagnostic recordings are kept in this browser's storage on the
 
 Files are CSV with a few `#` comment lines at the top (record type, time, summary, and for recordings the table of step markers), then a header row:
 
-- `keiser-cal-YYYY-MM-DD-HHMM.csv`: `point,label,x_uT,y_uT,z_uT,dist_prev_uT` (25 rows, Bottom, Gear 2 to Gear 24, Top).
+- `keiser-cal-YYYY-MM-DD-HHMM.csv`: `point,label,x_uT,y_uT,z_uT,dist_prev_uT` (25 rows, Bottom, Gear 2 to Gear 24, Top). A stored calibration read from v3 firmware also has a `# crank:` comment line (crank direction, dip depth and polarity).
 - `keiser-diag-YYYY-MM-DD-HHMM.csv`: `i,t_ms,step,x_uT,y_uT,z_uT,revs`, one row per 40 ms sample. `step` is the step that was running; `revs` is the cadence pod's crank count, empty when no pod was connected.
 
 Saved data stays on that phone and in that browser only. Export anything you want to keep.
@@ -64,6 +70,7 @@ The simulator also answers the stored-calibration request and runs diagnostic re
 
 Extra options, added after `?demo=1`:
 
+- `&v3=1`: simulate firmware v3 (cadence from the crank magnet, short pedalling stops, crank learning, calibration while pedalling at about 75 rpm, the Turns stream, and crank data in the stored calibration). Without it the simulator behaves like v2.
 - `&uncal=1`: start uncalibrated.
 - `&fast=1`: divide the diagnostic step times by 5 (the whole run takes about 35 s).
 - `&drop=1`: lose one line in the first recording transfer, to see "Transfer incomplete" and Retry.
